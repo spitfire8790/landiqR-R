@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Layers, Users, Grid3X3, Database, BarChart } from "lucide-react"
+import { PlusCircle, Layers, Users, Grid3X3, Database, BarChart, Menu, X } from "lucide-react"
 import { GroupDialog } from "@/components/group-dialog"
 import { CategoryDialog } from "@/components/category-dialog"
 import { PersonDialog } from "@/components/person-dialog"
 import { AllocationDialog } from "@/components/allocation-dialog"
+import { ThemeToggle } from "@/components/theme-toggle"
 import type { Person, Category, Allocation, Group } from "@/lib/types"
 import OrgChart from "@/components/org-chart"
 import GroupsTable from "@/components/groups-table"
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const [personDialogOpen, setPersonDialogOpen] = useState(false)
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("orgchart")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const { toast } = useToast()
 
@@ -353,7 +355,7 @@ export default function Dashboard() {
   if (!dbInitialized) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-lg">
+        <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-lg dark:bg-gray-900">
           <Database className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-4">Database Setup Required</h2>
           <p className="text-gray-600 mb-6">
@@ -363,7 +365,7 @@ export default function Dashboard() {
           <Button
             onClick={initializeDatabase}
             disabled={initializingDb}
-            className="bg-black hover:bg-gray-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
+            className="bg-black hover:bg-gray-800 text-white shadow-md hover:shadow-lg transition-all duration-200 dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
           >
             {initializingDb ? (
               <>
@@ -385,24 +387,40 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 bg-white">
-        <div className="flex items-center">
-          <img
-            src="/New_South_Wales_Government_logo.svg.png"
-            alt="New South Wales Government Logo"
-            className="h-8 w-auto mr-2"
-          />
-          <h1 className="text-xl font-bold text-gray-900">Land iQ Responsibility Allocation</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="flex items-center justify-between mb-3 sm:mb-0">
+          <div className="flex items-center">
+            <img
+              src="/New_South_Wales_Government_logo.svg.png"
+              alt="New South Wales Government Logo"
+              className="h-6 sm:h-8 w-auto mr-2"
+            />
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white dark:neon-text">Land iQ Responsibility</h1>
+          </div>
+          <div className="flex items-center gap-2 sm:hidden">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="dark:text-white dark:hover:bg-gray-800"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setGroupDialogOpen(true)} size="sm" className="bg-black hover:bg-gray-800 text-white">
+        
+        {/* Desktop Action Buttons */}
+        <div className="hidden sm:flex gap-2 items-center">
+          <ThemeToggle />
+          <Button onClick={() => setGroupDialogOpen(true)} size="sm" className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Group
           </Button>
           <Button
             onClick={() => setCategoryDialogOpen(true)}
             size="sm"
-            className="bg-gray-800 hover:bg-gray-700 text-white"
+            className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
             disabled={groups.length === 0}
           >
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -411,7 +429,7 @@ export default function Dashboard() {
           <Button
             onClick={() => setPersonDialogOpen(true)}
             size="sm"
-            className="bg-gray-700 hover:bg-gray-600 text-white"
+            className="bg-gray-700 hover:bg-gray-600 text-white dark:bg-green-600 dark:hover:bg-green-700 dark:neon-green-glow"
           >
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Person
@@ -419,37 +437,74 @@ export default function Dashboard() {
           <Button
             onClick={() => setAllocationDialogOpen(true)}
             size="sm"
-            className="bg-gray-600 hover:bg-gray-500 text-white"
+            className="bg-gray-600 hover:bg-gray-500 text-white dark:bg-purple-600 dark:hover:bg-purple-700 dark:neon-purple-glow"
             disabled={categories.length === 0 || people.length === 0}
           >
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Allocation
           </Button>
         </div>
+
+        {/* Mobile Action Buttons */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden flex flex-col gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <Button onClick={() => {setGroupDialogOpen(true); setMobileMenuOpen(false)}} size="sm" className="bg-black hover:bg-gray-800 text-white w-full justify-start dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Group
+            </Button>
+            <Button
+              onClick={() => {setCategoryDialogOpen(true); setMobileMenuOpen(false)}}
+              size="sm"
+              className="bg-gray-800 hover:bg-gray-700 text-white w-full justify-start dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
+              disabled={groups.length === 0}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Category
+            </Button>
+            <Button
+              onClick={() => {setPersonDialogOpen(true); setMobileMenuOpen(false)}}
+              size="sm"
+              className="bg-gray-700 hover:bg-gray-600 text-white w-full justify-start dark:bg-green-600 dark:hover:bg-green-700 dark:neon-green-glow"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Person
+            </Button>
+            <Button
+              onClick={() => {setAllocationDialogOpen(true); setMobileMenuOpen(false)}}
+              size="sm"
+              className="bg-gray-600 hover:bg-gray-500 text-white w-full justify-start dark:bg-purple-600 dark:hover:bg-purple-700 dark:neon-purple-glow"
+              disabled={categories.length === 0 || people.length === 0}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Allocation
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Custom Tab Navigation */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="flex">
+      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="flex overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setActiveTab("orgchart")}
             className={cn(
-              "flex items-center py-2 px-4 text-sm font-medium rounded-none border-b-2 transition-colors",
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "orgchart"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+                ? "border-black text-black dark:border-cyan-400 dark:text-cyan-400 dark:neon-text"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:border-cyan-400",
             )}
           >
             <Grid3X3 className="mr-2 h-4 w-4" />
-            Orgchart
+            <span className="hidden sm:inline">Orgchart</span>
+            <span className="sm:hidden">Chart</span>
           </button>
           <button
             onClick={() => setActiveTab("groups")}
             className={cn(
-              "flex items-center py-2 px-4 text-sm font-medium rounded-none border-b-2 transition-colors",
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "groups"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+                ? "border-black text-black dark:border-pink-400 dark:text-pink-400 dark:neon-text"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-pink-400 dark:hover:border-pink-400",
             )}
           >
             <Layers className="mr-2 h-4 w-4" />
@@ -458,22 +513,23 @@ export default function Dashboard() {
           <button
             onClick={() => setActiveTab("categories")}
             className={cn(
-              "flex items-center py-2 px-4 text-sm font-medium rounded-none border-b-2 transition-colors",
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "categories"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+                ? "border-black text-black dark:border-green-400 dark:text-green-400 dark:neon-text"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-green-400 dark:hover:border-green-400",
             )}
           >
             <Layers className="mr-2 h-4 w-4" />
-            Categories
+            <span className="hidden sm:inline">Categories</span>
+            <span className="sm:hidden">Cats</span>
           </button>
           <button
             onClick={() => setActiveTab("people")}
             className={cn(
-              "flex items-center py-2 px-4 text-sm font-medium rounded-none border-b-2 transition-colors",
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "people"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+                ? "border-black text-black dark:border-purple-400 dark:text-purple-400 dark:neon-text"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:border-purple-400",
             )}
           >
             <Users className="mr-2 h-4 w-4" />
@@ -482,20 +538,21 @@ export default function Dashboard() {
           <button
             onClick={() => setActiveTab("analytics")}
             className={cn(
-              "flex items-center py-2 px-4 text-sm font-medium rounded-none border-b-2 transition-colors",
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "analytics"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+                ? "border-black text-black dark:border-yellow-400 dark:text-yellow-400 dark:neon-text"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-yellow-400 dark:hover:border-yellow-400",
             )}
           >
             <BarChart className="mr-2 h-4 w-4" />
-            Analytics
+            <span className="hidden sm:inline">Analytics</span>
+            <span className="sm:hidden">Stats</span>
           </button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden dark:bg-gray-900">
         {activeTab === "orgchart" && (
           <div className="h-full">
             <OrgChart
