@@ -82,6 +82,29 @@ export async function ensureTablesExist() {
           UNIQUE(task_id, person_id)
         );
         
+        -- Chat messages table
+        CREATE TABLE IF NOT EXISTS public.messages (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          author_email TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Ensure the messages table is part of the realtime publication
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_publication_tables 
+            WHERE pubname = 'supabase_realtime' 
+              AND schemaname = 'public' 
+              AND tablename = 'messages'
+          ) THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+          END IF;
+        END;
+        $$;
+        
         -- Create indexes for better performance
         CREATE INDEX IF NOT EXISTS idx_categories_group_id ON public.categories(group_id);
         CREATE INDEX IF NOT EXISTS idx_allocations_category_id ON public.allocations(category_id);

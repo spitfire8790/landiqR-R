@@ -1,35 +1,64 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Star, X, PlusCircle, AlertCircle, GripVertical } from "lucide-react"
-import type { Person, Category, Allocation, Group } from "@/lib/types"
-import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { motion, AnimatePresence } from "framer-motion"
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
+import React, { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Star,
+  X,
+  PlusCircle,
+  AlertCircle,
+  User,
+  Clock,
+  Edit,
+  Trash2,
+} from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import type {
+  Person,
+  Category,
+  Allocation,
+  Group,
+  Task,
+  TaskAllocation,
+} from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { fetchTasksByCategory, fetchTaskAllocations } from "@/lib/data-service";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   horizontalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface OrgChartProps {
-  groups: Group[]
-  categories: Category[]
-  people: Person[]
-  allocations: Allocation[]
-  onDeleteAllocation: (id: string) => void
-  onAddGroup: () => void
-  onAddCategory: () => void
-  onAddAllocation: () => void
-  onCategoryClick?: (categoryId: string) => void
+  groups: Group[];
+  categories: Category[];
+  people: Person[];
+  allocations: Allocation[];
+  onDeleteAllocation: (id: string) => void;
+  onAddGroup: () => void;
+  onAddCategory: () => void;
+  onAddAllocation: () => void;
+  onCategoryClick?: (categoryId: string) => void;
 }
 
 // Sortable item wrapper for groups
@@ -38,65 +67,85 @@ function SortableGroup({
   children,
   width,
 }: {
-  group: Group
-  children: React.ReactNode
-  width: number
+  group: Group;
+  children: React.ReactNode;
+  width: number;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: `group-${group.id}`,
     data: {
       type: "group",
       group,
     },
-  })
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : 1,
     width: width ? `${width}px` : "auto",
-  }
+  };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="relative">
-      <div
-        {...listeners}
-        className="absolute top-2 left-2 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 z-10"
-      >
-        <GripVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="relative cursor-grab active:cursor-grabbing"
+    >
       {children}
     </div>
-  )
+  );
 }
 
 // Sortable item wrapper for categories
-function SortableCategory({ category, children }: { category: Category; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+function SortableCategory({
+  category,
+  children,
+}: {
+  category: Category;
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: `category-${category.id}`,
     data: {
       type: "category",
       category,
     },
-  })
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 10 : 1,
-  }
+  };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="relative">
-      <div
-        {...listeners}
-        className="absolute top-2 right-2 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 z-10"
-      >
-        <GripVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="relative cursor-grab active:cursor-grabbing"
+    >
       {children}
     </div>
-  )
+  );
 }
 
 // Group container component
@@ -107,13 +156,15 @@ function GroupContainer({
   highlightedCategory,
   setHighlightedCategory,
   onCategoryClick,
+  onCategoryClickForTasks,
 }: {
-  group: Group
-  categories: Category[]
-  onDragEnd: (event: any) => void
-  highlightedCategory: string | null
-  setHighlightedCategory: (id: string | null) => void
-  onCategoryClick?: (categoryId: string) => void
+  group: Group;
+  categories: Category[];
+  onDragEnd: (event: any) => void;
+  highlightedCategory: string | null;
+  setHighlightedCategory: (id: string | null) => void;
+  onCategoryClick?: (categoryId: string) => void;
+  onCategoryClickForTasks?: (categoryId: string) => void;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -123,31 +174,48 @@ function GroupContainer({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  )
+    })
+  );
 
   return (
     <div className="flex flex-col w-full">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={categories.map((c) => `category-${c.id}`)} strategy={horizontalListSortingStrategy}>
-          <div className="flex gap-4 mt-4">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
+        <SortableContext
+          items={categories.map((c) => `category-${c.id}`)}
+          strategy={horizontalListSortingStrategy}
+        >
+          <div className="flex gap-2 mt-0">
             {categories.map((category) => (
               <SortableCategory key={category.id} category={category}>
                 <motion.div
                   className={cn(
-                    "p-3 rounded-lg shadow-sm border transition-all duration-200 w-36 h-[70px] flex items-center",
+                    "p-2 rounded-lg shadow-lg border-2 transition-all duration-200 w-32 h-[80px] flex items-start relative overflow-hidden",
                     highlightedCategory === category.id
-                      ? "bg-black dark:bg-pink-600 text-white border-gray-800 dark:border-pink-400 dark:neon-pink-glow"
-                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700",
+                      ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white border-indigo-400 shadow-indigo-500/50 dark:neon-pink-glow"
+                      : "bg-slate-400 text-white border-slate-300 shadow-slate-400/30 hover:bg-slate-500 hover:shadow-slate-500/50 transform hover:scale-105"
                   )}
-                  whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+                  whileHover={{
+                    y: -2,
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+                  }}
                   transition={{ duration: 0.2 }}
                   onClick={() => {
-                    setHighlightedCategory(highlightedCategory === category.id ? null : category.id)
-                    if (onCategoryClick) onCategoryClick(category.id)
+                    setHighlightedCategory(
+                      highlightedCategory === category.id ? null : category.id
+                    );
+                    if (onCategoryClickForTasks)
+                      onCategoryClickForTasks(category.id);
                   }}
                 >
-                  <div className="font-medium text-xs pr-6 text-gray-900 dark:text-white">{category.name}</div>
+                  <div className="font-bold text-xs pr-3 text-white drop-shadow-sm whitespace-normal">
+                    {category.name}
+                  </div>
+                  {/* Subtle shine effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
                 </motion.div>
               </SortableCategory>
             ))}
@@ -155,7 +223,7 @@ function GroupContainer({
         </SortableContext>
       </DndContext>
     </div>
-  )
+  );
 }
 
 export default function OrgChart({
@@ -169,45 +237,62 @@ export default function OrgChart({
   onAddAllocation,
   onCategoryClick,
 }: OrgChartProps) {
-  const [activeView, setActiveView] = useState("matrix")
-  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null)
-  const [highlightedOrg, setHighlightedOrg] = useState<string | null>(null)
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  const [activeView, setActiveView] = useState("matrix");
+  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(
+    null
+  );
+  const [highlightedOrg, setHighlightedOrg] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  // Tasks state
+  const [selectedCategoryForTasks, setSelectedCategoryForTasks] = useState<
+    string | null
+  >(null);
+  const [categoryTasks, setCategoryTasks] = useState<Task[]>([]);
+  const [taskAllocations, setTaskAllocations] = useState<
+    Record<string, TaskAllocation[]>
+  >({});
+  const [loadingTasks, setLoadingTasks] = useState(false);
 
   // State for drag and drop ordering
-  const [orderedGroups, setOrderedGroups] = useState<Group[]>([])
-  const [orderedCategories, setOrderedCategories] = useState<Record<string, Category[]>>({})
+  const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
+  const [orderedCategories, setOrderedCategories] = useState<
+    Record<string, Category[]>
+  >({});
 
   // Calculate group widths based on number of categories
   const groupWidths = useMemo(() => {
-    const widths: Record<string, number> = {}
+    const widths: Record<string, number> = {};
 
     Object.entries(orderedCategories).forEach(([groupId, cats]) => {
-      // Each category is 144px (w-36) wide with 16px gap (4 in tailwind)
-      widths[groupId] = cats.length > 0 ? cats.length * 144 + (cats.length - 1) * 16 : 0
-    })
+      // Each category is 128px (w-32) wide with 8px gap (2 in tailwind)
+      widths[groupId] =
+        cats.length > 0 ? cats.length * 128 + (cats.length - 1) * 8 : 0;
+    });
 
-    return widths
-  }, [orderedCategories])
+    return widths;
+  }, [orderedCategories]);
 
   // Initialize ordered groups and categories
   useEffect(() => {
-    setOrderedGroups([...groups])
+    setOrderedGroups([...groups]);
 
-    const categoryMap: Record<string, Category[]> = {}
+    const categoryMap: Record<string, Category[]> = {};
     groups.forEach((group) => {
-      const groupCategories = categories.filter((cat) => cat.groupId === group.id)
-      categoryMap[group.id] = groupCategories
-    })
+      const groupCategories = categories.filter(
+        (cat) => cat.groupId === group.id
+      );
+      categoryMap[group.id] = groupCategories;
+    });
 
-    setOrderedCategories(categoryMap)
-  }, [groups, categories])
+    setOrderedCategories(categoryMap);
+  }, [groups, categories]);
 
   // Reset highlights when data changes
   useEffect(() => {
-    setHighlightedCategory(null)
-    setHighlightedOrg(null)
-  }, [categories, groups])
+    setHighlightedCategory(null);
+    setHighlightedOrg(null);
+  }, [categories, groups]);
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -218,97 +303,161 @@ export default function OrgChart({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  )
+    })
+  );
 
   // Handle drag end for groups
   const handleDragEndGroups = (event: any) => {
-    const { active, over } = event
+    const { active, over } = event;
 
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id) return;
 
-    const activeId = String(active.id).replace("group-", "")
-    const overId = String(over.id).replace("group-", "")
+    const activeId = String(active.id).replace("group-", "");
+    const overId = String(over.id).replace("group-", "");
 
-    const oldIndex = orderedGroups.findIndex((g) => g.id === activeId)
-    const newIndex = orderedGroups.findIndex((g) => g.id === overId)
+    const oldIndex = orderedGroups.findIndex((g) => g.id === activeId);
+    const newIndex = orderedGroups.findIndex((g) => g.id === overId);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      setOrderedGroups(arrayMove(orderedGroups, oldIndex, newIndex))
+      setOrderedGroups(arrayMove(orderedGroups, oldIndex, newIndex));
     }
-  }
+  };
 
   // Handle drag end for categories within a specific group
   const handleDragEndCategories = (groupId: string) => (event: any) => {
-    const { active, over } = event
+    const { active, over } = event;
 
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id) return;
 
-    const activeId = String(active.id).replace("category-", "")
-    const overId = String(over.id).replace("category-", "")
+    const activeId = String(active.id).replace("category-", "");
+    const overId = String(over.id).replace("category-", "");
 
-    const groupCategories = [...(orderedCategories[groupId] || [])]
-    const oldIndex = groupCategories.findIndex((c) => c.id === activeId)
-    const newIndex = groupCategories.findIndex((c) => c.id === overId)
+    const groupCategories = [...(orderedCategories[groupId] || [])];
+    const oldIndex = groupCategories.findIndex((c) => c.id === activeId);
+    const newIndex = groupCategories.findIndex((c) => c.id === overId);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newGroupCategories = arrayMove(groupCategories, oldIndex, newIndex)
+      const newGroupCategories = arrayMove(groupCategories, oldIndex, newIndex);
       setOrderedCategories({
         ...orderedCategories,
         [groupId]: newGroupCategories,
-      })
+      });
     }
-  }
+  };
 
   const getOrgColor = (org: string, isHighlighted = false) => {
     const baseColors = {
-      PDNSW: isHighlighted 
-        ? "bg-blue-900 text-white border-blue-800 dark:bg-blue-600 dark:neon-glow" 
+      PDNSW: isHighlighted
+        ? "bg-blue-900 text-white border-blue-800 dark:bg-blue-600 dark:neon-glow"
         : "bg-blue-800/90 text-white border-blue-900 dark:bg-blue-700 dark:border-blue-500",
-      WSP: isHighlighted 
-        ? "bg-red-200 text-red-900 border-red-300 dark:bg-red-600 dark:text-white dark:neon-pink-glow" 
+      WSP: isHighlighted
+        ? "bg-red-200 text-red-900 border-red-300 dark:bg-red-600 dark:text-white dark:neon-pink-glow"
         : "bg-red-100 text-red-800 border-red-200 dark:bg-red-700 dark:text-red-100 dark:border-red-500",
-      Giraffe: isHighlighted 
-        ? "bg-orange-200 text-orange-900 border-orange-300 dark:bg-orange-600 dark:text-white dark:neon-glow" 
+      Giraffe: isHighlighted
+        ? "bg-orange-200 text-orange-900 border-orange-300 dark:bg-orange-600 dark:text-white dark:neon-glow"
         : "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-500",
-    }
-    return baseColors[org as keyof typeof baseColors] || (isHighlighted 
-      ? "bg-gray-200 text-gray-900 border-gray-400 dark:bg-gray-600 dark:text-white dark:neon-glow" 
-      : "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-500")
-  }
+    };
+    return (
+      baseColors[org as keyof typeof baseColors] ||
+      (isHighlighted
+        ? "bg-gray-200 text-gray-900 border-gray-400 dark:bg-gray-600 dark:text-white dark:neon-glow"
+        : "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-500")
+    );
+  };
 
-  const organisations = ["PDNSW", "WSP", "Giraffe"]
+  const organisations = ["PDNSW", "WSP", "Giraffe"];
 
   // Get categories for a specific group
   const getCategoriesForGroup = (groupId: string) => {
-    return orderedCategories[groupId] || []
-  }
+    return orderedCategories[groupId] || [];
+  };
 
   // Check if there's any data
-  const hasData = groups.length > 0 || categories.length > 0 || people.length > 0
+  const hasData =
+    groups.length > 0 || categories.length > 0 || people.length > 0;
 
   // Get allocations for a specific category and organisation, filtered by selected person if applicable
   const getAllocationsForCategoryAndOrg = (categoryId: string, org: string) => {
-    return allocations.filter(
-      (a) => {
-        // Filter by category and organisation
-        const matchesBasicCriteria = a.categoryId === categoryId && 
-          people.find((p) => p.id === a.personId)?.organisation === org;
-        
-        // If a person is selected, only show their allocations
-        if (selectedPersonId) {
-          return matchesBasicCriteria && a.personId === selectedPersonId;
-        }
-        
-        return matchesBasicCriteria;
+    return allocations.filter((a) => {
+      // Filter by category and organisation
+      const matchesBasicCriteria =
+        a.categoryId === categoryId &&
+        people.find((p) => p.id === a.personId)?.organisation === org;
+
+      // If a person is selected, only show their allocations
+      if (selectedPersonId) {
+        return matchesBasicCriteria && a.personId === selectedPersonId;
       }
-    )
-  }
+
+      return matchesBasicCriteria;
+    });
+  };
 
   // Check if a cell should be highlighted
   const isCellHighlighted = (categoryId: string, org: string) => {
-    return highlightedCategory === categoryId || highlightedOrg === org
-  }
+    return highlightedCategory === categoryId || highlightedOrg === org;
+  };
+
+  // Helper function to extract first name
+  const getFirstName = (fullName: string) => {
+    return fullName.split(" ")[0];
+  };
+
+  // Load tasks for selected category
+  const loadTasksForCategory = async (categoryId: string) => {
+    setLoadingTasks(true);
+    try {
+      const tasksData = await fetchTasksByCategory(categoryId);
+      setCategoryTasks(tasksData);
+
+      // Load allocations for each task
+      const allocationsData: Record<string, TaskAllocation[]> = {};
+      for (const task of tasksData) {
+        const allocations = await fetchTaskAllocations(task.id);
+        allocationsData[task.id] = allocations;
+      }
+      setTaskAllocations(allocationsData);
+    } catch (error) {
+      console.error("Error loading tasks:", error);
+      setCategoryTasks([]);
+      setTaskAllocations({});
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // Handle category click for tasks
+  const handleCategoryClickForTasks = (categoryId: string) => {
+    if (selectedCategoryForTasks === categoryId) {
+      // If already selected, deselect
+      setSelectedCategoryForTasks(null);
+      setCategoryTasks([]);
+      setTaskAllocations({});
+    } else {
+      // Select new category
+      setSelectedCategoryForTasks(categoryId);
+      loadTasksForCategory(categoryId);
+    }
+  };
+
+  // Get person name for task allocations
+  const getPersonNameForTask = (personId: string) => {
+    const person = people.find((p) => p.id === personId);
+    return person ? getFirstName(person.name) : "Unknown";
+  };
+
+  // Get category name
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    return category?.name || "Unknown";
+  };
+
+  // Resolve a Lucide icon from the group's icon name (string stored in DB)
+  const resolveGroupIcon = (iconName?: string) => {
+    if (!iconName) return (LucideIcons as any)["Folder"];
+    const Icon = (LucideIcons as any)[iconName];
+    return Icon ? Icon : (LucideIcons as any)["Folder"];
+  };
 
   return (
     <TooltipProvider>
@@ -316,15 +465,19 @@ export default function OrgChart({
         {/* Header with legend and controls */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white dark:neon-text">Land iQ Functional Responsibility Chart</h2>
-            
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white dark:neon-text">
+              Land iQ Functional Responsibility Chart
+            </h2>
+
             {/* Legend for Lead */}
             <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-1 border border-gray-200 dark:border-gray-600 shadow-sm">
               <Star className="h-4 w-4 text-yellow-400" />
               <span className="font-medium">Lead</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">- Indicates the person is a Lead for this responsibility</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                - Indicates the person is a Lead for this responsibility
+              </span>
             </div>
-            
+
             {/* Mobile-optimised organisation legend */}
             <div className="flex flex-wrap gap-2 text-xs sm:text-sm">
               <div className="flex items-center gap-1">
@@ -337,7 +490,9 @@ export default function OrgChart({
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-orange-100 dark:bg-orange-700 border border-orange-200 dark:border-orange-500 rounded"></div>
-                <span className="text-gray-700 dark:text-gray-300">Giraffe</span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  Giraffe
+                </span>
               </div>
             </div>
           </div>
@@ -358,7 +513,7 @@ export default function OrgChart({
                   </option>
                 ))}
             </select>
-            
+
             {selectedPersonId && (
               <Button
                 variant="ghost"
@@ -383,13 +538,16 @@ export default function OrgChart({
                 className="text-center bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-w-md"
               >
                 <AlertCircle className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No data available yet</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  No data available yet
+                </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-                  Start by creating groups, then add categories within those groups, and finally allocate people to categories.
+                  Start by creating groups, then add categories within those
+                  groups, and finally allocate people to categories.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    onClick={onAddGroup} 
+                  <Button
+                    onClick={onAddGroup}
                     className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -406,9 +564,9 @@ export default function OrgChart({
                   onClick={() => setActiveView("matrix")}
                   className={cn(
                     "py-2 px-4 text-sm font-medium transition-colors rounded-md",
-                    activeView === "matrix" 
-                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow" 
-                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white",
+                    activeView === "matrix"
+                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow"
+                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
                   )}
                 >
                   Matrix View
@@ -417,9 +575,9 @@ export default function OrgChart({
                   onClick={() => setActiveView("org")}
                   className={cn(
                     "py-2 px-4 text-sm font-medium transition-colors rounded-md",
-                    activeView === "org" 
-                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow" 
-                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white",
+                    activeView === "org"
+                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow"
+                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
                   )}
                 >
                   Organisation View
@@ -437,7 +595,7 @@ export default function OrgChart({
                     className="h-full"
                   >
                     {activeView === "matrix" ? (
-                      <div className="h-full flex flex-col">
+                      <div className="h-full">
                         {categories.length === 0 ? (
                           <div className="flex-1 flex items-center justify-center">
                             <motion.div
@@ -447,16 +605,26 @@ export default function OrgChart({
                             >
                               {groups.length === 0 ? (
                                 <>
-                                  <p className="text-gray-500 dark:text-gray-400 mb-4">No groups or categories defined yet.</p>
-                                  <Button onClick={onAddGroup} className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
+                                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                    No groups or categories defined yet.
+                                  </p>
+                                  <Button
+                                    onClick={onAddGroup}
+                                    className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
+                                  >
                                     <PlusCircle className="mr-2 h-4 w-4" />
                                     Add First Group
                                   </Button>
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-gray-500 dark:text-gray-400 mb-4">You have groups but no categories yet.</p>
-                                  <Button onClick={onAddCategory} className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow">
+                                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                    You have groups but no categories yet.
+                                  </p>
+                                  <Button
+                                    onClick={onAddCategory}
+                                    className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
+                                  >
                                     <PlusCircle className="mr-2 h-4 w-4" />
                                     Add First Category
                                   </Button>
@@ -465,16 +633,17 @@ export default function OrgChart({
                             </motion.div>
                           </div>
                         ) : (
-                          <div className="flex-1 overflow-hidden">
-                            {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
-                            <div className="h-full w-full overflow-auto">
-                              <div className="pb-4 pr-4 min-w-max">
+                          <>
+                            <div className="overflow-auto">
+                              <div className="min-w-max">
                                 {/* Matrix Header - Organisation label */}
-                                <div className="grid grid-cols-[200px_1fr] gap-4 mb-4">
-                                  <div className="font-bold p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm text-gray-900 dark:text-white sticky top-0 left-0 z-20">Organisation</div>
+                                <div className="grid grid-cols-[180px_1fr] gap-3 mb-3">
+                                  <div className="font-bold p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm text-gray-900 dark:text-white sticky top-0 left-0 z-20">
+                                    Organisation
+                                  </div>
 
                                   {/* Group headers and their categories */}
-                                  <div className="grid gap-4">
+                                  <div className="grid gap-3">
                                     {/* Group headers row with DnD */}
                                     <DndContext
                                       sensors={sensors}
@@ -482,36 +651,64 @@ export default function OrgChart({
                                       onDragEnd={handleDragEndGroups}
                                     >
                                       <SortableContext
-                                        items={orderedGroups.map((g) => `group-${g.id}`)}
+                                        items={orderedGroups.map(
+                                          (g) => `group-${g.id}`
+                                        )}
                                         strategy={horizontalListSortingStrategy}
                                       >
-                                        <div className="flex gap-4 min-w-max">
+                                        <div className="flex gap-2 min-w-max">
                                           {orderedGroups.map((group) => {
-                                            const groupCategories = getCategoriesForGroup(group.id)
-                                            if (groupCategories.length === 0) return null
+                                            const groupCategories =
+                                              getCategoriesForGroup(group.id);
+                                            if (groupCategories.length === 0)
+                                              return null;
 
-                                            const groupWidth = groupWidths[group.id] || 0
+                                            const groupWidth =
+                                              groupWidths[group.id] || 0;
 
                                             return (
-                                              <SortableGroup key={group.id} group={group} width={groupWidth}>
+                                              <SortableGroup
+                                                key={group.id}
+                                                group={group}
+                                                width={groupWidth}
+                                              >
                                                 <div
-                                                  className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg shadow-sm h-[56px] flex items-center"
+                                                  className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 p-3 rounded-lg shadow-lg h-[48px] flex items-center justify-center border border-slate-500"
                                                   style={{ width: "100%" }}
                                                 >
-                                                  <div className="font-bold pl-6 text-gray-900 dark:text-white">{group.name}</div>
+                                                  <div className="flex items-center gap-1 text-white drop-shadow-sm font-bold">
+                                                    {React.createElement(
+                                                      resolveGroupIcon(
+                                                        group.icon
+                                                      ),
+                                                      { className: "h-4 w-4" }
+                                                    )}
+                                                    <span>{group.name}</span>
+                                                  </div>
                                                 </div>
 
                                                 {/* Categories for this group */}
                                                 <GroupContainer
                                                   group={group}
                                                   categories={groupCategories}
-                                                  onDragEnd={handleDragEndCategories(group.id)}
-                                                  highlightedCategory={highlightedCategory}
-                                                  setHighlightedCategory={setHighlightedCategory}
-                                                  onCategoryClick={onCategoryClick}
+                                                  onDragEnd={handleDragEndCategories(
+                                                    group.id
+                                                  )}
+                                                  highlightedCategory={
+                                                    highlightedCategory
+                                                  }
+                                                  setHighlightedCategory={
+                                                    setHighlightedCategory
+                                                  }
+                                                  onCategoryClick={
+                                                    onCategoryClick
+                                                  }
+                                                  onCategoryClickForTasks={
+                                                    handleCategoryClickForTasks
+                                                  }
                                                 />
                                               </SortableGroup>
-                                            )
+                                            );
                                           })}
                                         </div>
                                       </SortableContext>
@@ -521,135 +718,330 @@ export default function OrgChart({
 
                                 {/* Matrix Rows - One per organisation */}
                                 {organisations.map((org) => (
-                                  <div key={org} className="grid grid-cols-[200px_1fr] gap-4 mb-4">
+                                  <div
+                                    key={org}
+                                    className="grid grid-cols-[180px_1fr] gap-3 mb-1"
+                                  >
                                     <motion.div
                                       className={cn(
                                         "p-4 rounded-lg font-medium shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden sticky top-0 left-0 z-10",
-                                        getOrgColor(org, highlightedOrg === org),
+                                        getOrgColor(org, highlightedOrg === org)
                                       )}
                                       whileHover={{ scale: 1.02 }}
                                       transition={{ duration: 0.2 }}
-                                      onClick={() => setHighlightedOrg(highlightedOrg === org ? null : org)}
+                                      onClick={() =>
+                                        setHighlightedOrg(
+                                          highlightedOrg === org ? null : org
+                                        )
+                                      }
                                     >
                                       {org}
                                     </motion.div>
 
-                                    <div className="flex gap-4 min-w-max">
+                                    <div className="flex gap-2 min-w-max">
                                       {orderedGroups.map((group) => {
-                                        const groupCategories = getCategoriesForGroup(group.id)
-                                        if (groupCategories.length === 0) return null
+                                        const groupCategories =
+                                          getCategoriesForGroup(group.id);
+                                        if (groupCategories.length === 0)
+                                          return null;
 
                                         return (
-                                          <div key={`${org}-${group.id}`} className="flex gap-4">
+                                          <div
+                                            key={`${org}-${group.id}`}
+                                            className="flex gap-2"
+                                          >
                                             {groupCategories.map((category) => {
-                                              const cellAllocations = getAllocationsForCategoryAndOrg(category.id, org)
-                                              const isHighlighted = isCellHighlighted(category.id, org)
+                                              const cellAllocations =
+                                                getAllocationsForCategoryAndOrg(
+                                                  category.id,
+                                                  org
+                                                );
+                                              const isHighlighted =
+                                                isCellHighlighted(
+                                                  category.id,
+                                                  org
+                                                );
 
                                               return (
                                                 <motion.div
                                                   key={`${org}-${category.id}`}
                                                   className={cn(
-                                                    "border p-2 rounded-lg shadow-sm transition-all duration-200 w-36 flex-1 cursor-pointer",
+                                                    "border p-2 rounded-lg shadow-sm transition-all duration-200 w-32 flex-1 cursor-pointer",
                                                     isHighlighted
                                                       ? "bg-gray-50 dark:bg-gray-700 border-gray-400 dark:border-gray-500 shadow-md"
-                                                      : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600",
+                                                      : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600"
                                                   )}
-                                                  whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+                                                  whileHover={{
+                                                    y: -2,
+                                                    boxShadow:
+                                                      "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+                                                  }}
                                                   transition={{ duration: 0.2 }}
-                                                  onClick={() => {
-                                                    if (onCategoryClick) onCategoryClick(category.id)
-                                                    onAddAllocation()
+                                                  onClick={(e) => {
+                                                    // Check if click was on the delete button
+                                                    if (
+                                                      (
+                                                        e.target as HTMLElement
+                                                      ).closest("button")
+                                                    ) {
+                                                      return; // Don't trigger category click if delete button was clicked
+                                                    }
+                                                    handleCategoryClickForTasks(
+                                                      category.id
+                                                    );
+                                                    onAddAllocation();
                                                   }}
                                                 >
-                                                  {cellAllocations.length === 0 ? (
+                                                  {cellAllocations.length ===
+                                                  0 ? (
                                                     <div
                                                       className="text-xs text-gray-400 dark:text-gray-500 italic h-full flex items-center justify-center cursor-pointer"
                                                       onClick={() => {
-                                                        if (onCategoryClick) onCategoryClick(category.id)
-                                                        onAddAllocation()
+                                                        handleCategoryClickForTasks(
+                                                          category.id
+                                                        );
+                                                        onAddAllocation();
                                                       }}
                                                     >
                                                       <PlusCircle className="h-4 w-4 opacity-50" />
                                                     </div>
                                                   ) : (
-                                                    <div className="flex flex-col space-y-2 flex-1">
-                                                      {cellAllocations.map((allocation) => {
-                                                        const person = people.find((p) => p.id === allocation.personId)
-                                                        if (!person) return null
-                                                        return (
-                                                          <motion.div
-                                                            key={allocation.id}
-                                                            className={cn(
-                                                              "flex justify-between items-center p-1.5 rounded-md border shadow-sm",
-                                                              allocation.isLead
-                                                                ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-600 shadow-yellow-200 dark:neon-yellow-glow"
-                                                                : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600",
-                                                              isHighlighted && !allocation.isLead ? "border-gray-300 dark:border-gray-500" : ""
-                                                            )}
-                                                            whileHover={{ scale: 1.02 }}
-                                                            transition={{ duration: 0.2 }}
-                                                          >
-                                                            <div className="flex items-center gap-1">
-                                                              {allocation.isLead && (
-                                                                <TooltipProvider>
-                                                                  <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                      <Star className="h-3 w-3 text-yellow-400 flex-shrink-0 animate-pulse" />
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                      <p>Lead</p>
-                                                                    </TooltipContent>
-                                                                  </Tooltip>
-                                                                </TooltipProvider>
-                                                              )}
-                                                              <div>
-                                                                <div className="font-medium text-xs text-gray-900 dark:text-white">{person.name}</div>
-                                                              </div>
-                                                            </div>
+                                                    <div className="flex flex-col space-y-1 flex-1">
+                                                      {cellAllocations.map(
+                                                        (allocation) => {
+                                                          const person =
+                                                            people.find(
+                                                              (p) =>
+                                                                p.id ===
+                                                                allocation.personId
+                                                            );
+                                                          if (!person)
+                                                            return null;
+                                                          return (
                                                             <motion.div
-                                                              whileHover={{ scale: 1.1 }}
-                                                              whileTap={{ scale: 0.9 }}
+                                                              key={
+                                                                allocation.id
+                                                              }
+                                                              className={cn(
+                                                                "flex justify-between items-center p-1.5 rounded-md border shadow-sm cursor-pointer",
+                                                                allocation.isLead
+                                                                  ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-600 shadow-yellow-200 dark:neon-yellow-glow"
+                                                                  : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600",
+                                                                isHighlighted &&
+                                                                  !allocation.isLead
+                                                                  ? "border-gray-300 dark:border-gray-500"
+                                                                  : ""
+                                                              )}
+                                                              whileHover={{
+                                                                scale: 1.02,
+                                                              }}
+                                                              transition={{
+                                                                duration: 0.2,
+                                                              }}
+                                                              onClick={(e) => {
+                                                                // Check if click was on the delete button
+                                                                if (
+                                                                  (
+                                                                    e.target as HTMLElement
+                                                                  ).closest(
+                                                                    "button"
+                                                                  )
+                                                                ) {
+                                                                  return; // Don't trigger category click if delete button was clicked
+                                                                }
+                                                                handleCategoryClickForTasks(
+                                                                  category.id
+                                                                );
+                                                              }}
                                                             >
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => onDeleteAllocation(allocation.id)}
-                                                                className="h-5 w-5 opacity-50 hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white"
+                                                              <div className="flex items-center gap-1">
+                                                                {allocation.isLead && (
+                                                                  <TooltipProvider>
+                                                                    <Tooltip>
+                                                                      <TooltipTrigger
+                                                                        asChild
+                                                                      >
+                                                                        <Star className="h-3 w-3 text-yellow-400 flex-shrink-0 animate-pulse" />
+                                                                      </TooltipTrigger>
+                                                                      <TooltipContent>
+                                                                        <p>
+                                                                          Lead
+                                                                        </p>
+                                                                      </TooltipContent>
+                                                                    </Tooltip>
+                                                                  </TooltipProvider>
+                                                                )}
+                                                                <div>
+                                                                  <div className="font-medium text-xs text-gray-900 dark:text-white">
+                                                                    {getFirstName(
+                                                                      person.name
+                                                                    )}
+                                                                  </div>
+                                                                </div>
+                                                              </div>
+                                                              <motion.div
+                                                                whileHover={{
+                                                                  scale: 1.1,
+                                                                }}
+                                                                whileTap={{
+                                                                  scale: 0.9,
+                                                                }}
                                                               >
-                                                                <X className="h-3 w-3" />
-                                                                <span className="sr-only">Remove</span>
-                                                              </Button>
+                                                                <Button
+                                                                  variant="ghost"
+                                                                  size="icon"
+                                                                  onClick={() =>
+                                                                    onDeleteAllocation(
+                                                                      allocation.id
+                                                                    )
+                                                                  }
+                                                                  className="h-5 w-5 opacity-50 hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white"
+                                                                >
+                                                                  <X className="h-3 w-3" />
+                                                                  <span className="sr-only">
+                                                                    Remove
+                                                                  </span>
+                                                                </Button>
+                                                              </motion.div>
                                                             </motion.div>
-                                                          </motion.div>
-                                                        )
-                                                      })}
+                                                          );
+                                                        }
+                                                      )}
                                                     </div>
                                                   )}
                                                 </motion.div>
-                                              )
+                                              );
                                             })}
                                           </div>
-                                        )
+                                        );
                                       })}
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             </div>
-                          </div>
+
+                            {/* Tasks Section */}
+                            {selectedCategoryForTasks && (
+                              <div className="pt-0 mt-0 px-0 border-0 bg-transparent">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-xs font-semibold text-gray-900 dark:text-white">
+                                    Tasks for{" "}
+                                    {getCategoryName(selectedCategoryForTasks)}
+                                  </h3>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedCategoryForTasks(null);
+                                      setCategoryTasks([]);
+                                      setTaskAllocations({});
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                    Close
+                                  </Button>
+                                </div>
+
+                                {loadingTasks ? (
+                                  <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+                                    <p className="text-gray-600">
+                                      Loading tasks...
+                                    </p>
+                                  </div>
+                                ) : categoryTasks.length === 0 ? (
+                                  <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-gray-600 dark:text-gray-400">
+                                      No tasks found for this category
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                                      <thead>
+                                        <tr>
+                                          <th className="px-4 py-2 border-b text-left">
+                                            Task Name
+                                          </th>
+                                          <th className="px-4 py-2 border-b text-left">
+                                            Description
+                                          </th>
+                                          <th className="px-4 py-2 border-b text-left">
+                                            Hours per Week
+                                          </th>
+                                          <th className="px-4 py-2 border-b text-left">
+                                            Allocated To
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {categoryTasks.map((task) => {
+                                          const allocations =
+                                            taskAllocations[task.id] || [];
+                                          return (
+                                            <tr
+                                              key={task.id}
+                                              className="border-b hover:bg-gray-50"
+                                            >
+                                              <td className="px-4 py-2 font-medium text-xs">
+                                                {task.name}
+                                              </td>
+                                              <td className="px-4 py-2 text-xs">
+                                                {task.description}
+                                              </td>
+                                              <td className="px-4 py-2 text-xs">
+                                                {task.hoursPerWeek}
+                                              </td>
+                                              <td className="px-4 py-2">
+                                                <div className="flex flex-wrap gap-1">
+                                                  {allocations.length > 0 ? (
+                                                    allocations.map(
+                                                      (allocation) => (
+                                                        <Badge
+                                                          key={allocation.id}
+                                                          variant="secondary"
+                                                          className="text-xs"
+                                                        >
+                                                          {getPersonNameForTask(
+                                                            allocation.personId
+                                                          )}
+                                                          {allocation.isLead &&
+                                                            " (Lead)"}
+                                                        </Badge>
+                                                      )
+                                                    )
+                                                  ) : (
+                                                    <span className="text-gray-400 text-xs">
+                                                      Unassigned
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ) : (
                       /* Organisation View - Mobile optimised */
                       <div className="h-full flex flex-col">
                         <div className="flex-1 overflow-y-auto min-h-0">
-                          <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 pb-8 min-h-full">
+                          <div className="space-y-3 sm:space-y-4 p-2 sm:p-4 pb-2 min-h-full">
                             {organisations.map((org) => (
                               <motion.div
                                 key={org}
                                 className={cn(
                                   "border rounded-lg overflow-hidden shadow-lg",
-                                  getOrgColor(org, highlightedOrg === org),
+                                  getOrgColor(org, highlightedOrg === org)
                                 )}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -661,19 +1053,24 @@ export default function OrgChart({
                                 <div className="p-3 sm:p-4">
                                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {orderedGroups.map((group) => {
-                                      const groupCategories = getCategoriesForGroup(group.id)
+                                      const groupCategories =
+                                        getCategoriesForGroup(group.id);
 
-                                      if (groupCategories.length === 0) return null
+                                      if (groupCategories.length === 0)
+                                        return null;
 
-                                      const hasAllocations = groupCategories.some((category) =>
-                                        allocations.some(
-                                          (a) =>
-                                            a.categoryId === category.id &&
-                                            people.find((p) => p.id === a.personId)?.organisation === org,
-                                        ),
-                                      )
+                                      const hasAllocations =
+                                        groupCategories.some((category) =>
+                                          allocations.some(
+                                            (a) =>
+                                              a.categoryId === category.id &&
+                                              people.find(
+                                                (p) => p.id === a.personId
+                                              )?.organisation === org
+                                          )
+                                        );
 
-                                      if (!hasAllocations) return null
+                                      if (!hasAllocations) return null;
 
                                       return (
                                         <motion.div
@@ -681,101 +1078,159 @@ export default function OrgChart({
                                           className="border bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
                                           whileHover={{
                                             y: -5,
-                                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                                            boxShadow:
+                                              "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
                                           }}
                                           transition={{ duration: 0.2 }}
                                         >
                                           <div className="bg-gray-100 dark:bg-gray-700 p-3 border-b dark:border-gray-600">
-                                            <h4 className="font-bold text-gray-900 dark:text-white">{group.name}</h4>
+                                            <h4 className="flex items-center gap-1 font-bold text-gray-900 dark:text-white">
+                                              {React.createElement(
+                                                resolveGroupIcon(group.icon),
+                                                { className: "h-4 w-4" }
+                                              )}
+                                              <span>{group.name}</span>
+                                            </h4>
                                           </div>
                                           <div className="p-3 space-y-4">
                                             {groupCategories.map((category) => {
-                                              const categoryAllocations = allocations.filter(
-                                                (a) =>
-                                                  a.categoryId === category.id &&
-                                                  people.find((p) => p.id === a.personId)?.organisation === org,
-                                              )
+                                              const categoryAllocations =
+                                                allocations.filter(
+                                                  (a) =>
+                                                    a.categoryId ===
+                                                      category.id &&
+                                                    people.find(
+                                                      (p) => p.id === a.personId
+                                                    )?.organisation === org
+                                                );
 
-                                              if (categoryAllocations.length === 0) return null
+                                              if (
+                                                categoryAllocations.length === 0
+                                              )
+                                                return null;
 
                                               return (
-                                                <div key={category.id} className="border-t dark:border-gray-600 pt-3">
+                                                <div
+                                                  key={category.id}
+                                                  className="border-t dark:border-gray-600 pt-3"
+                                                >
                                                   <div className="flex justify-between items-center mb-2">
-                                                    <h5 className="font-medium text-sm text-gray-700 dark:text-gray-300">{category.name}</h5>
+                                                    <h5 className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                                                      {category.name}
+                                                    </h5>
                                                     <Button
                                                       variant="ghost"
                                                       size="icon"
                                                       onClick={() => {
-                                                        if (onCategoryClick) onCategoryClick(category.id)
-                                                        onAddAllocation()
+                                                        onAddAllocation();
                                                       }}
                                                       className="h-6 w-6 hover:bg-gray-100 dark:hover:bg-gray-600"
                                                     >
                                                       <PlusCircle className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                      <span className="sr-only">Add allocation</span>
+                                                      <span className="sr-only">
+                                                        Add allocation
+                                                      </span>
                                                     </Button>
                                                   </div>
                                                   <ul className="space-y-2">
-                                                    {categoryAllocations.map((allocation) => {
-                                                      const person = people.find((p) => p.id === allocation.personId)
-                                                      return person ? (
-                                                        <motion.div
-                                                          key={allocation.id}
-                                                          className="flex justify-between items-center p-1.5 rounded-md border shadow-sm bg-white dark:bg-gray-700 mb-1 border-gray-200 dark:border-gray-600"
-                                                          whileHover={{ scale: 1.02, backgroundColor: "#f9fafb" }}
-                                                          transition={{ duration: 0.2 }}
-                                                        >
-                                                          <div className="flex items-center gap-1">
-                                                            {allocation.isLead && (
-                                                              <TooltipProvider>
-                                                                <Tooltip>
-                                                                  <TooltipTrigger asChild>
-                                                                    <Star className="h-3 w-3 text-yellow-400 flex-shrink-0" />
-                                                                  </TooltipTrigger>
-                                                                  <TooltipContent>
-                                                                    <p>Lead</p>
-                                                                  </TooltipContent>
-                                                                </Tooltip>
-                                                              </TooltipProvider>
-                                                            )}
-                                                            <div>
-                                                              <div className="font-medium text-gray-900 dark:text-white">
-                                                                {person.name}
-                                                              </div>
-                                                              {person.role && (
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400">{person.role}</div>
-                                                              )}
-                                                            </div>
-                                                          </div>
+                                                    {categoryAllocations.map(
+                                                      (allocation) => {
+                                                        const person =
+                                                          people.find(
+                                                            (p) =>
+                                                              p.id ===
+                                                              allocation.personId
+                                                          );
+                                                        return person ? (
                                                           <motion.div
-                                                            whileHover={{ scale: 1.1 }}
-                                                            whileTap={{ scale: 0.9 }}
+                                                            key={allocation.id}
+                                                            className="flex justify-between items-center p-1.5 rounded-md border shadow-sm bg-white dark:bg-gray-700 mb-1 border-gray-200 dark:border-gray-600"
+                                                            whileHover={{
+                                                              scale: 1.02,
+                                                              backgroundColor:
+                                                                "#f9fafb",
+                                                            }}
+                                                            transition={{
+                                                              duration: 0.2,
+                                                            }}
                                                           >
-                                                            <Button
-                                                              variant="ghost"
-                                                              size="icon"
-                                                              onClick={() => onDeleteAllocation(allocation.id)}
-                                                              className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                                            <div className="flex items-center gap-1">
+                                                              {allocation.isLead && (
+                                                                <TooltipProvider>
+                                                                  <Tooltip>
+                                                                    <TooltipTrigger
+                                                                      asChild
+                                                                    >
+                                                                      <Star className="h-3 w-3 text-yellow-400 flex-shrink-0" />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                      <p>
+                                                                        Lead
+                                                                      </p>
+                                                                    </TooltipContent>
+                                                                  </Tooltip>
+                                                                </TooltipProvider>
+                                                              )}
+                                                              <div>
+                                                                <div className="font-medium text-gray-900 dark:text-white">
+                                                                  {getFirstName(
+                                                                    person.name
+                                                                  )}
+                                                                </div>
+                                                                {person.role && (
+                                                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {
+                                                                      person.role
+                                                                    }
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                            <motion.div
+                                                              whileHover={{
+                                                                scale: 1.1,
+                                                              }}
+                                                              whileTap={{
+                                                                scale: 0.9,
+                                                              }}
                                                             >
-                                                              <X className="h-4 w-4" />
-                                                              <span className="sr-only">Remove</span>
-                                                            </Button>
+                                                              <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() =>
+                                                                  onDeleteAllocation(
+                                                                    allocation.id
+                                                                  )
+                                                                }
+                                                                className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                                              >
+                                                                <X className="h-4 w-4" />
+                                                                <span className="sr-only">
+                                                                  Remove
+                                                                </span>
+                                                              </Button>
+                                                            </motion.div>
                                                           </motion.div>
-                                                        </motion.div>
-                                                      ) : null
-                                                    })}
+                                                        ) : null;
+                                                      }
+                                                    )}
                                                   </ul>
                                                 </div>
-                                              )
+                                              );
                                             })}
                                           </div>
                                         </motion.div>
-                                      )
+                                      );
                                     })}
                                     {groups.length === 0 && (
                                       <div className="col-span-3 text-center py-8">
-                                        <p className="text-gray-500 dark:text-gray-400 mb-4">No groups defined yet.</p>
-                                        <Button onClick={onAddGroup} className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
+                                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                          No groups defined yet.
+                                        </p>
+                                        <Button
+                                          onClick={onAddGroup}
+                                          className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
+                                        >
                                           <PlusCircle className="mr-2 h-4 w-4" />
                                           Add First Group
                                         </Button>
@@ -797,5 +1252,5 @@ export default function OrgChart({
         </div>
       </div>
     </TooltipProvider>
-  )
+  );
 }

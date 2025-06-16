@@ -52,3 +52,12 @@ export interface TaskAllocation {
   estimatedWeeklyHours: number
   createdAt: string
 }
+
+// Realtime chat message
+export interface Message {
+  id: string
+  user_id: string
+  content: string
+  created_at: string
+  author_email: string
+}

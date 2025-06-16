@@ -1,89 +1,124 @@
-'use client'
+"use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { ADMIN_EMAILS, READONLY_EMAILS } from "@/lib/auth-config";
 
-type UserRole = 'admin' | 'readonly' | null
+export type UserRole = "admin" | "readonly" | null;
 
 interface AuthContextType {
-  isAuthenticated: boolean
-  userRole: UserRole
-  login: (password: string) => boolean
-  logout: () => void
-  isLoading: boolean
-  isAdmin: boolean
-  isReadOnly: boolean
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  userRole: UserRole;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  isAdmin: boolean;
+  isReadOnly: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [userRole, setUserRole] = useState<UserRole>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already logged in on mount
+  // Helper: extract role from the current session (metadata.role)
+  const deriveRoleFromSession = (session: any): UserRole => {
+    return (session?.user?.user_metadata?.role as UserRole) || null;
+  };
+
+  // Initialise auth state once on mount and subscribe to further changes
   useEffect(() => {
-    const authStatus = localStorage.getItem('landiq-auth')
-    const savedRole = localStorage.getItem('landiq-role') as UserRole
-    if (authStatus === 'authenticated' && savedRole) {
-      setIsAuthenticated(true)
-      setUserRole(savedRole)
-    }
-    setIsLoading(false)
-  }, [])
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      const currentSession = data.session;
+      setIsAuthenticated(!!currentSession);
+      setUserRole(deriveRoleFromSession(currentSession));
+      setIsLoading(false);
+    };
 
-  const login = (password: string): boolean => {
-    // Get passwords from environment variables with fallbacks
-    const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin2024'
-    const readonlyPassword = process.env.NEXT_PUBLIC_READONLY_PASSWORD || 'readonly2024'
-    
-    let role: UserRole = null
-    
-    if (password === adminPassword) {
-      role = 'admin'
-    } else if (password === readonlyPassword) {
-      role = 'readonly'
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsAuthenticated(!!session);
+        setUserRole(deriveRoleFromSession(session));
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Sign-in helper
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      console.error("Login error:", error);
+      return false;
     }
-    
-    if (role) {
-      setIsAuthenticated(true)
-      setUserRole(role)
-      localStorage.setItem('landiq-auth', 'authenticated')
-      localStorage.setItem('landiq-role', role)
-      return true
+    return true;
+  };
+
+  // Sign-up helper (stores selected role in user_metadata)
+  const signup = async (email: string, password: string): Promise<boolean> => {
+    // Only allow exact whitelisted emails
+    if (!ADMIN_EMAILS.includes(email) && !READONLY_EMAILS.includes(email)) {
+      console.warn("Signup attempt blocked: unauthorised email");
+      return false;
     }
-    return false
-  }
+
+    const role: UserRole = ADMIN_EMAILS.includes(email) ? "admin" : "readonly";
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { role },
+      },
+    });
+    if (error) {
+      console.error("Signup error:", error);
+      return false;
+    }
+    return true;
+  };
 
   const logout = () => {
-    setIsAuthenticated(false)
-    setUserRole(null)
-    localStorage.removeItem('landiq-auth')
-    localStorage.removeItem('landiq-role')
-  }
+    supabase.auth.signOut();
+  };
 
-  const isAdmin = userRole === 'admin'
-  const isReadOnly = userRole === 'readonly'
+  const isAdmin = userRole === "admin";
+  const isReadOnly = userRole === "readonly";
 
   return (
-    <AuthContext.Provider value={{ 
-      isAuthenticated, 
-      userRole, 
-      login, 
-      logout, 
-      isLoading, 
-      isAdmin, 
-      isReadOnly 
-    }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        isLoading,
+        userRole,
+        login,
+        signup,
+        logout,
+        isAdmin,
+        isReadOnly,
+      }}
+    >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
+  return context;
 }

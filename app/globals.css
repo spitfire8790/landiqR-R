@@ -10,46 +10,51 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-  
+
   /* Hide scrollbar for mobile navigation */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* Internet Explorer 10+ */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+    scrollbar-width: none; /* Firefox */
   }
-  .scrollbar-hide::-webkit-scrollbar { 
-    display: none;  /* Safari and Chrome */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
   }
-  
+
   /* Improve touch targets for mobile */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Neon glow effects for dark mode */
   .neon-glow {
-    box-shadow: 0 0 5px theme('colors.cyan.400'), 0 0 10px theme('colors.cyan.400'), 0 0 15px theme('colors.cyan.400');
+    box-shadow: 0 0 5px theme("colors.cyan.400"),
+      0 0 10px theme("colors.cyan.400"), 0 0 15px theme("colors.cyan.400");
   }
-  
+
   .neon-text {
-    text-shadow: 0 0 5px theme('colors.cyan.400'), 0 0 10px theme('colors.cyan.400');
+    text-shadow: 0 0 5px theme("colors.cyan.400"),
+      0 0 10px theme("colors.cyan.400");
   }
-  
+
   .neon-border {
-    border: 1px solid theme('colors.cyan.400');
-    box-shadow: 0 0 5px theme('colors.cyan.400');
+    border: 1px solid theme("colors.cyan.400");
+    box-shadow: 0 0 5px theme("colors.cyan.400");
   }
-  
+
   .neon-pink-glow {
-    box-shadow: 0 0 5px theme('colors.pink.400'), 0 0 10px theme('colors.pink.400'), 0 0 15px theme('colors.pink.400');
+    box-shadow: 0 0 5px theme("colors.pink.400"),
+      0 0 10px theme("colors.pink.400"), 0 0 15px theme("colors.pink.400");
   }
-  
+
   .neon-green-glow {
-    box-shadow: 0 0 5px theme('colors.green.400'), 0 0 10px theme('colors.green.400'), 0 0 15px theme('colors.green.400');
+    box-shadow: 0 0 5px theme("colors.green.400"),
+      0 0 10px theme("colors.green.400"), 0 0 15px theme("colors.green.400");
   }
-  
+
   .neon-purple-glow {
-    box-shadow: 0 0 5px theme('colors.purple.400'), 0 0 10px theme('colors.purple.400'), 0 0 15px theme('colors.purple.400');
+    box-shadow: 0 0 5px theme("colors.purple.400"),
+      0 0 10px theme("colors.purple.400"), 0 0 15px theme("colors.purple.400");
   }
 }
 
@@ -89,7 +94,7 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-  
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -132,4 +137,10 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+body.chat-open,
+html.chat-open body {
+  padding-right: 380px;
+  transition: padding-right 0.3s ease;
 }
