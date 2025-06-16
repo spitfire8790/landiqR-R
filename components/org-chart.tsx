@@ -29,6 +29,7 @@ interface OrgChartProps {
   onAddGroup: () => void
   onAddCategory: () => void
   onAddAllocation: () => void
+  onCategoryClick?: (categoryId: string) => void
 }
 
 // Sortable item wrapper for groups
@@ -105,12 +106,14 @@ function GroupContainer({
   onDragEnd,
   highlightedCategory,
   setHighlightedCategory,
+  onCategoryClick,
 }: {
   group: Group
   categories: Category[]
   onDragEnd: (event: any) => void
   highlightedCategory: string | null
   setHighlightedCategory: (id: string | null) => void
+  onCategoryClick?: (categoryId: string) => void
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -139,7 +142,10 @@ function GroupContainer({
                   )}
                   whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
                   transition={{ duration: 0.2 }}
-                  onClick={() => setHighlightedCategory(highlightedCategory === category.id ? null : category.id)}
+                  onClick={() => {
+                    setHighlightedCategory(highlightedCategory === category.id ? null : category.id)
+                    if (onCategoryClick) onCategoryClick(category.id)
+                  }}
                 >
                   <div className="font-medium text-xs pr-6 text-gray-900 dark:text-white">{category.name}</div>
                 </motion.div>
@@ -161,6 +167,7 @@ export default function OrgChart({
   onAddGroup,
   onAddCategory,
   onAddAllocation,
+  onCategoryClick,
 }: OrgChartProps) {
   const [activeView, setActiveView] = useState("matrix")
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null)
@@ -280,11 +287,11 @@ export default function OrgChart({
   // Check if there's any data
   const hasData = groups.length > 0 || categories.length > 0 || people.length > 0
 
-  // Get allocations for a specific category and organization, filtered by selected person if applicable
+  // Get allocations for a specific category and organisation, filtered by selected person if applicable
   const getAllocationsForCategoryAndOrg = (categoryId: string, org: string) => {
     return allocations.filter(
       (a) => {
-        // Filter by category and organization
+        // Filter by category and organisation
         const matchesBasicCriteria = a.categoryId === categoryId && 
           people.find((p) => p.id === a.personId)?.organisation === org;
         
@@ -318,7 +325,7 @@ export default function OrgChart({
               <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">- Indicates the person is a Lead for this responsibility</span>
             </div>
             
-            {/* Mobile-optimized organization legend */}
+            {/* Mobile-optimised organisation legend */}
             <div className="flex flex-wrap gap-2 text-xs sm:text-sm">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-blue-800 dark:bg-blue-600 rounded border"></div>
@@ -367,7 +374,7 @@ export default function OrgChart({
         </div>
 
         {/* Main content area */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {!hasData ? (
             <div className="h-full flex items-center justify-center p-4">
               <motion.div
@@ -394,7 +401,7 @@ export default function OrgChart({
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden p-2 sm:p-4">
               {/* Custom Tab Navigation for Matrix/Org View */}
-              <div className="grid grid-cols-2 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+              <div className="grid grid-cols-2 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg flex-shrink-0">
                 <button
                   onClick={() => setActiveView("matrix")}
                   className={cn(
@@ -419,7 +426,7 @@ export default function OrgChart({
                 </button>
               </div>
 
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden min-h-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeView}
@@ -462,9 +469,9 @@ export default function OrgChart({
                             {/* Mobile: Vertical stack, Desktop: Horizontal scroll */}
                             <div className="h-full w-full overflow-auto">
                               <div className="pb-4 pr-4 min-w-max">
-                                {/* Matrix Header - Organization label */}
+                                {/* Matrix Header - Organisation label */}
                                 <div className="grid grid-cols-[200px_1fr] gap-4 mb-4">
-                                  <div className="font-bold p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm text-gray-900 dark:text-white sticky top-0 z-10">Organisation</div>
+                                  <div className="font-bold p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm text-gray-900 dark:text-white sticky top-0 left-0 z-20">Organisation</div>
 
                                   {/* Group headers and their categories */}
                                   <div className="grid gap-4">
@@ -501,6 +508,7 @@ export default function OrgChart({
                                                   onDragEnd={handleDragEndCategories(group.id)}
                                                   highlightedCategory={highlightedCategory}
                                                   setHighlightedCategory={setHighlightedCategory}
+                                                  onCategoryClick={onCategoryClick}
                                                 />
                                               </SortableGroup>
                                             )
@@ -516,7 +524,7 @@ export default function OrgChart({
                                   <div key={org} className="grid grid-cols-[200px_1fr] gap-4 mb-4">
                                     <motion.div
                                       className={cn(
-                                        "p-4 rounded-lg font-medium shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden sticky top-0 z-10",
+                                        "p-4 rounded-lg font-medium shadow-sm border cursor-pointer transition-all duration-200 overflow-hidden sticky top-0 left-0 z-10",
                                         getOrgColor(org, highlightedOrg === org),
                                       )}
                                       whileHover={{ scale: 1.02 }}
@@ -548,12 +556,18 @@ export default function OrgChart({
                                                   )}
                                                   whileHover={{ y: -2, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
                                                   transition={{ duration: 0.2 }}
-                                                  onClick={onAddAllocation}
+                                                  onClick={() => {
+                                                    if (onCategoryClick) onCategoryClick(category.id)
+                                                    onAddAllocation()
+                                                  }}
                                                 >
                                                   {cellAllocations.length === 0 ? (
                                                     <div
                                                       className="text-xs text-gray-400 dark:text-gray-500 italic h-full flex items-center justify-center cursor-pointer"
-                                                      onClick={onAddAllocation}
+                                                      onClick={() => {
+                                                        if (onCategoryClick) onCategoryClick(category.id)
+                                                        onAddAllocation()
+                                                      }}
                                                     >
                                                       <PlusCircle className="h-4 w-4 opacity-50" />
                                                     </div>
@@ -626,10 +640,10 @@ export default function OrgChart({
                         )}
                       </div>
                     ) : (
-                      /* Organization View - Mobile optimized */
+                      /* Organisation View - Mobile optimised */
                       <div className="h-full flex flex-col">
-                        <div className="flex-1 overflow-y-auto">
-                          <div className="space-y-4 sm:space-y-6 p-2 sm:p-4">
+                        <div className="flex-1 overflow-y-auto min-h-0">
+                          <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 pb-8 min-h-full">
                             {organisations.map((org) => (
                               <motion.div
                                 key={org}
@@ -691,7 +705,10 @@ export default function OrgChart({
                                                     <Button
                                                       variant="ghost"
                                                       size="icon"
-                                                      onClick={onAddAllocation}
+                                                      onClick={() => {
+                                                        if (onCategoryClick) onCategoryClick(category.id)
+                                                        onAddAllocation()
+                                                      }}
                                                       className="h-6 w-6 hover:bg-gray-100 dark:hover:bg-gray-600"
                                                     >
                                                       <PlusCircle className="h-3 w-3 text-gray-500 dark:text-gray-400" />

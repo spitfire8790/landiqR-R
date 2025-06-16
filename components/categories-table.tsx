@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { Category, Group } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { PencilIcon, TrashIcon } from "lucide-react"
+import { PencilIcon, TrashIcon, ChevronUp, ChevronDown } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -31,11 +31,16 @@ interface CategoriesTableProps {
   onDelete: (id: string) => void
 }
 
+type SortField = 'name' | 'description' | 'group'
+type SortDirection = 'asc' | 'desc'
+
 export default function CategoriesTable({ categories, groups, onEdit, onDelete }: CategoriesTableProps) {
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const handleEdit = (category: Category) => {
     setEditCategory(category)
@@ -66,27 +71,80 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
     return group ? group.name : 'Unknown Group'
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedCategories = [...categories].sort((a, b) => {
+    let aValue: string
+    let bValue: string
+    
+    if (sortField === 'group') {
+      aValue = getGroupName(a.groupId).toLowerCase()
+      bValue = getGroupName(b.groupId).toLowerCase()
+    } else {
+      aValue = a[sortField].toLowerCase()
+      bValue = b[sortField].toLowerCase()
+    }
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
+  })
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="h-4 w-4 inline ml-1" /> : 
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+  }
+
   return (
     <div className="p-4">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Group</TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('name')}
+              >
+                Name
+                <SortIcon field="name" />
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('description')}
+              >
+                Description
+                <SortIcon field="description" />
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('group')}
+              >
+                Group
+                <SortIcon field="group" />
+              </TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.length === 0 ? (
+            {sortedCategories.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
                   No categories found. Add a category to get started.
                 </TableCell>
               </TableRow>
             ) : (
-              categories.map((category) => (
+              sortedCategories.map((category) => (
                 <TableRow key={category.id}>
                   <TableCell>{category.name}</TableCell>
                   <TableCell>{category.description}</TableCell>

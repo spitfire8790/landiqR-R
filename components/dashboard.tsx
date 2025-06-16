@@ -2,18 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Layers, Users, Grid3X3, Database, BarChart, Menu, X } from "lucide-react"
+import { PlusCircle, Layers, Users, Grid3X3, Database, BarChart, Menu, X, LogOut, UserPlus, ListPlus, CheckSquare } from "lucide-react"
 import { GroupDialog } from "@/components/group-dialog"
 import { CategoryDialog } from "@/components/category-dialog"
 import { PersonDialog } from "@/components/person-dialog"
 import { AllocationDialog } from "@/components/allocation-dialog"
-import { ThemeToggle } from "@/components/theme-toggle"
-import type { Person, Category, Allocation, Group } from "@/lib/types"
+import { SimpleTaskDialog } from "@/components/simple-task-dialog"
+import { useAuth } from "@/contexts/auth-context"
+import type { Person, Category, Allocation, Group, Task } from "@/lib/types"
 import OrgChart from "@/components/org-chart"
 import GroupsTable from "@/components/groups-table"
 import CategoriesTable from "@/components/categories-table"
 import PeopleTable from "@/components/people-table"
 import ResponsibilityChart from "@/components/responsibility-chart"
+import SimpleTasksView from "@/components/simple-tasks-view"
 import {
   fetchGroups,
   createGroup,
@@ -30,6 +32,10 @@ import {
   fetchAllocations,
   createAllocation,
   deleteAllocation,
+  fetchTasks,
+  createTask,
+  updateTask,
+  deleteTask,
   ensureTablesExist,
 } from "@/lib/data-service"
 import { useToast } from "@/hooks/use-toast"
@@ -41,6 +47,7 @@ export default function Dashboard() {
   const [categories, setCategories] = useState<Category[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [dbInitialized, setDbInitialized] = useState(false)
   const [initializingDb, setInitializingDb] = useState(false)
@@ -49,10 +56,20 @@ export default function Dashboard() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const [personDialogOpen, setPersonDialogOpen] = useState(false)
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("orgchart")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const { toast } = useToast()
+  const { logout, isAdmin, userRole } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    })
+  }
 
   // Initialize database and fetch data
   useEffect(() => {
@@ -65,17 +82,19 @@ export default function Dashboard() {
 
         if (tablesExist) {
           // If tables exist, fetch data
-          const [groupsData, categoriesData, peopleData, allocationsData] = await Promise.all([
+          const [groupsData, categoriesData, peopleData, allocationsData, tasksData] = await Promise.all([
             fetchGroups(),
             fetchCategories(),
             fetchPeople(),
             fetchAllocations(),
+            fetchTasks(),
           ])
 
           setGroups(groupsData)
           setCategories(categoriesData)
           setPeople(peopleData)
           setAllocations(allocationsData)
+          setTasks(tasksData)
         }
       } catch (error) {
         console.error("Error initializing and loading data:", error)
@@ -341,6 +360,64 @@ export default function Dashboard() {
     }
   }
 
+  const addTaskHandler = async (taskData: Omit<Task, "id" | "createdAt">) => {
+    try {
+      const newTask = await createTask(taskData)
+      if (newTask) {
+        setTasks([...tasks, newTask])
+      }
+    } catch (error) {
+      console.error("Error creating task:", error)
+    }
+  }
+
+  const updateTaskHandler = async (updatedTask: Task) => {
+    try {
+      const result = await updateTask(updatedTask)
+      if (result) {
+        setTasks(tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
+        toast({
+          title: "Success",
+          description: "Task updated successfully",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteTaskHandler = async (id: string) => {
+    try {
+      const success = await deleteTask(id)
+      if (success) {
+        setTasks(tasks.filter((t) => t.id !== id))
+        toast({
+          title: "Success",
+          description: "Task deleted successfully",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCategoryClick = (categoryId: string) => {
+    // Switch to tasks tab and select the category
+    setActiveTab("tasks")
+    // The SimpleTasksView will handle category selection internally
+    // We could add state management here if needed for pre-selection
+  }
+
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center">
@@ -365,7 +442,7 @@ export default function Dashboard() {
           <Button
             onClick={initializeDatabase}
             disabled={initializingDb}
-            className="bg-black hover:bg-gray-800 text-white shadow-md hover:shadow-lg transition-all duration-200 dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
+            className="bg-black text-white hover:bg-gray-800 transition-colors"
           >
             {initializingDb ? (
               <>
@@ -387,111 +464,81 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-        <div className="flex items-center justify-between mb-3 sm:mb-0">
-          <div className="flex items-center">
-            <img
-              src="/New_South_Wales_Government_logo.svg.png"
-              alt="New South Wales Government Logo"
-              className="h-6 sm:h-8 w-auto mr-2"
-            />
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white dark:neon-text">Land iQ Responsibility</h1>
-          </div>
-          <div className="flex items-center gap-2 sm:hidden">
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="dark:text-white dark:hover:bg-gray-800"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+      <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-2xl font-bold text-gray-900">Land iQ Responsibility Allocation</h1>
+          <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+            {userRole?.toUpperCase()}
           </div>
         </div>
-        
-        {/* Desktop Action Buttons */}
-        <div className="hidden sm:flex gap-2 items-center">
-          <ThemeToggle />
-          <Button onClick={() => setGroupDialogOpen(true)} size="sm" className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Group
-          </Button>
+        <div className="flex items-center space-x-2">
+          {/* Action Buttons - Only show if admin */}
+          {isAdmin && (
+            <>
+              <Button
+                onClick={() => setGroupDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Group
+              </Button>
+              <Button
+                onClick={() => setCategoryDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Category
+              </Button>
+              <Button
+                onClick={() => setPersonDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Person
+              </Button>
+              <Button
+                onClick={() => setAllocationDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <ListPlus className="mr-2 h-4 w-4" />
+                Add Allocation
+              </Button>
+              <Button
+                onClick={() => setTaskDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                Add Task
+              </Button>
+            </>
+          )}
           <Button
-            onClick={() => setCategoryDialogOpen(true)}
+            onClick={handleLogout}
+            variant="outline"
             size="sm"
-            className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
-            disabled={groups.length === 0}
+            className="bg-black text-white border-black hover:bg-gray-800 hover:border-gray-800 transition-colors"
           >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Category
-          </Button>
-          <Button
-            onClick={() => setPersonDialogOpen(true)}
-            size="sm"
-            className="bg-gray-700 hover:bg-gray-600 text-white dark:bg-green-600 dark:hover:bg-green-700 dark:neon-green-glow"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Person
-          </Button>
-          <Button
-            onClick={() => setAllocationDialogOpen(true)}
-            size="sm"
-            className="bg-gray-600 hover:bg-gray-500 text-white dark:bg-purple-600 dark:hover:bg-purple-700 dark:neon-purple-glow"
-            disabled={categories.length === 0 || people.length === 0}
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Allocation
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
           </Button>
         </div>
-
-        {/* Mobile Action Buttons */}
-        {mobileMenuOpen && (
-          <div className="sm:hidden flex flex-col gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <Button onClick={() => {setGroupDialogOpen(true); setMobileMenuOpen(false)}} size="sm" className="bg-black hover:bg-gray-800 text-white w-full justify-start dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Group
-            </Button>
-            <Button
-              onClick={() => {setCategoryDialogOpen(true); setMobileMenuOpen(false)}}
-              size="sm"
-              className="bg-gray-800 hover:bg-gray-700 text-white w-full justify-start dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
-              disabled={groups.length === 0}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Category
-            </Button>
-            <Button
-              onClick={() => {setPersonDialogOpen(true); setMobileMenuOpen(false)}}
-              size="sm"
-              className="bg-gray-700 hover:bg-gray-600 text-white w-full justify-start dark:bg-green-600 dark:hover:bg-green-700 dark:neon-green-glow"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Person
-            </Button>
-            <Button
-              onClick={() => {setAllocationDialogOpen(true); setMobileMenuOpen(false)}}
-              size="sm"
-              className="bg-gray-600 hover:bg-gray-500 text-white w-full justify-start dark:bg-purple-600 dark:hover:bg-purple-700 dark:neon-purple-glow"
-              disabled={categories.length === 0 || people.length === 0}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Allocation
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Custom Tab Navigation */}
-      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="border-b border-gray-200 bg-white">
         <div className="flex overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setActiveTab("orgchart")}
             className={cn(
               "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "orgchart"
-                ? "border-black text-black dark:border-cyan-400 dark:text-cyan-400 dark:neon-text"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-cyan-400 dark:hover:border-cyan-400",
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
             )}
           >
             <Grid3X3 className="mr-2 h-4 w-4" />
@@ -503,8 +550,8 @@ export default function Dashboard() {
             className={cn(
               "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "groups"
-                ? "border-black text-black dark:border-pink-400 dark:text-pink-400 dark:neon-text"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-pink-400 dark:hover:border-pink-400",
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
             )}
           >
             <Layers className="mr-2 h-4 w-4" />
@@ -515,8 +562,8 @@ export default function Dashboard() {
             className={cn(
               "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "categories"
-                ? "border-black text-black dark:border-green-400 dark:text-green-400 dark:neon-text"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-green-400 dark:hover:border-green-400",
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
             )}
           >
             <Layers className="mr-2 h-4 w-4" />
@@ -528,20 +575,32 @@ export default function Dashboard() {
             className={cn(
               "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "people"
-                ? "border-black text-black dark:border-purple-400 dark:text-purple-400 dark:neon-text"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:border-purple-400",
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
             )}
           >
             <Users className="mr-2 h-4 w-4" />
             People
           </button>
           <button
+            onClick={() => setActiveTab("tasks")}
+            className={cn(
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
+              activeTab === "tasks"
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
+            )}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            Tasks
+          </button>
+          <button
             onClick={() => setActiveTab("analytics")}
             className={cn(
               "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
               activeTab === "analytics"
-                ? "border-black text-black dark:border-yellow-400 dark:text-yellow-400 dark:neon-text"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300 dark:text-gray-400 dark:hover:text-yellow-400 dark:hover:border-yellow-400",
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300",
             )}
           >
             <BarChart className="mr-2 h-4 w-4" />
@@ -552,7 +611,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden dark:bg-gray-900">
+      <div className="flex-1 overflow-hidden bg-white">
         {activeTab === "orgchart" && (
           <div className="h-full">
             <OrgChart
@@ -560,17 +619,22 @@ export default function Dashboard() {
               categories={categories}
               people={people}
               allocations={allocations}
-              onDeleteAllocation={deleteAllocationHandler}
-              onAddGroup={() => setGroupDialogOpen(true)}
-              onAddCategory={() => setCategoryDialogOpen(true)}
-              onAddAllocation={() => setAllocationDialogOpen(true)}
+              onDeleteAllocation={isAdmin ? deleteAllocationHandler : () => {}}
+              onAddGroup={isAdmin ? () => setGroupDialogOpen(true) : () => {}}
+              onAddCategory={isAdmin ? () => setCategoryDialogOpen(true) : () => {}}
+              onAddAllocation={isAdmin ? () => setAllocationDialogOpen(true) : () => {}}
+              onCategoryClick={isAdmin ? handleCategoryClick : () => {}}
             />
           </div>
         )}
 
         {activeTab === "groups" && (
           <div className="h-full">
-            <GroupsTable groups={groups} onEdit={updateGroupHandler} onDelete={deleteGroupHandler} />
+            <GroupsTable 
+              groups={groups} 
+              onEdit={isAdmin ? updateGroupHandler : () => {}} 
+              onDelete={isAdmin ? deleteGroupHandler : () => {}} 
+            />
           </div>
         )}
 
@@ -579,15 +643,30 @@ export default function Dashboard() {
             <CategoriesTable
               categories={categories}
               groups={groups}
-              onEdit={updateCategoryHandler}
-              onDelete={deleteCategoryHandler}
+              onEdit={isAdmin ? updateCategoryHandler : () => {}}
+              onDelete={isAdmin ? deleteCategoryHandler : () => {}}
             />
           </div>
         )}
 
         {activeTab === "people" && (
           <div className="h-full">
-            <PeopleTable people={people} onEdit={updatePersonHandler} onDelete={deletePersonHandler} />
+            <PeopleTable 
+              people={people} 
+              onEdit={isAdmin ? updatePersonHandler : () => {}} 
+              onDelete={isAdmin ? deletePersonHandler : () => {}} 
+            />
+          </div>
+        )}
+
+        {activeTab === "tasks" && (
+          <div className="h-full">
+            <SimpleTasksView 
+              groups={groups}
+              categories={categories}
+              people={people}
+              isAdmin={isAdmin}
+            />
           </div>
         )}
 
@@ -598,25 +677,38 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Dialogs */}
-      <GroupDialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen} onSave={addGroup} />
+      {/* Dialogs - Only render if admin */}
+      {isAdmin && (
+        <>
+          <GroupDialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen} onSave={addGroup} />
 
-      <CategoryDialog
-        open={categoryDialogOpen}
-        onOpenChange={setCategoryDialogOpen}
-        onSave={addCategory}
-        groups={groups}
-      />
+          <CategoryDialog
+            open={categoryDialogOpen}
+            onOpenChange={setCategoryDialogOpen}
+            onSave={addCategory}
+            groups={groups}
+          />
 
-      <PersonDialog open={personDialogOpen} onOpenChange={setPersonDialogOpen} onSave={addPerson} />
+          <PersonDialog open={personDialogOpen} onOpenChange={setPersonDialogOpen} onSave={addPerson} />
 
-      <AllocationDialog
-        open={allocationDialogOpen}
-        onOpenChange={setAllocationDialogOpen}
-        onSave={addAllocationHandler}
-        categories={categories}
-        people={people}
-      />
+          <AllocationDialog
+            open={allocationDialogOpen}
+            onOpenChange={setAllocationDialogOpen}
+            onSave={addAllocationHandler}
+            categories={categories}
+            people={people}
+          />
+
+          <SimpleTaskDialog
+            open={taskDialogOpen}
+            onOpenChange={setTaskDialogOpen}
+            onSave={(taskData, allocatedPeople) => addTaskHandler(taskData)}
+            categories={categories}
+            availablePeople={people}
+            existingAllocations={[]}
+          />
+        </>
+      )}
     </div>
   )
 }

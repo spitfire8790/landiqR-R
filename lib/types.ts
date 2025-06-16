@@ -25,3 +25,30 @@ export interface Allocation {
   personId: string
   isLead?: boolean
 }
+
+export interface Task {
+  id: string
+  name: string
+  description: string
+  categoryId: string
+  hoursPerWeek: number
+  createdAt: string
+}
+
+export interface Responsibility {
+  id: string
+  description: string
+  taskId: string
+  assignedPersonId?: string
+  estimatedWeeklyHours: number
+  createdAt: string
+}
+
+export interface TaskAllocation {
+  id: string
+  taskId: string
+  personId: string
+  isLead?: boolean
+  estimatedWeeklyHours: number
+  createdAt: string
+}

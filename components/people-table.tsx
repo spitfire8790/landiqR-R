@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2 } from "lucide-react"
+import { Edit, Trash2, ChevronUp, ChevronDown } from "lucide-react"
 import { PersonDialog } from "@/components/person-dialog"
 import type { Person } from "@/lib/types"
 import {
@@ -25,11 +25,16 @@ interface PeopleTableProps {
   onDelete: (id: string) => void
 }
 
+type SortField = 'name' | 'email' | 'organisation' | 'role'
+type SortDirection = 'asc' | 'desc'
+
 export default function PeopleTable({ people, onEdit, onDelete }: PeopleTableProps) {
   const [editPerson, setEditPerson] = useState<Person | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const handleEdit = (person: Person) => {
     setEditPerson(person)
@@ -61,11 +66,38 @@ export default function PeopleTable({ people, onEdit, onDelete }: PeopleTablePro
     }
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedPeople = [...people].sort((a, b) => {
+    const aValue = a[sortField].toLowerCase()
+    const bValue = b[sortField].toLowerCase()
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
+  })
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="h-4 w-4 inline ml-1" /> : 
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+  }
+
   return (
     <>
       <div className="p-6">
         <h2 className="text-2xl font-bold mb-6 text-gray-900">People</h2>
-        {people.length === 0 ? (
+        {sortedPeople.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -79,15 +111,39 @@ export default function PeopleTable({ people, onEdit, onDelete }: PeopleTablePro
             <Table>
               <TableHeader className="bg-gray-100">
                 <TableRow>
-                  <TableHead className="font-semibold text-gray-700">Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Email</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Organisation</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Role</TableHead>
+                  <TableHead 
+                    className="font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => handleSort('name')}
+                  >
+                    Name
+                    <SortIcon field="name" />
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => handleSort('email')}
+                  >
+                    Email
+                    <SortIcon field="email" />
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => handleSort('organisation')}
+                  >
+                    Organisation
+                    <SortIcon field="organisation" />
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold text-gray-700 cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => handleSort('role')}
+                  >
+                    Role
+                    <SortIcon field="role" />
+                  </TableHead>
                   <TableHead className="w-[100px] font-semibold text-gray-700">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {people.map((person, index) => (
+                {sortedPeople.map((person, index) => (
                   <motion.tr
                     key={person.id}
                     initial={{ opacity: 0, y: 20 }}

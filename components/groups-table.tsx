@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2 } from "lucide-react"
+import { Edit, Trash2, ChevronUp, ChevronDown } from "lucide-react"
 import { GroupDialog } from "@/components/group-dialog"
 import type { Group } from "@/lib/types"
 import {
@@ -25,11 +25,16 @@ interface GroupsTableProps {
   onDelete: (id: string) => void
 }
 
+type SortField = 'name' | 'description'
+type SortDirection = 'asc' | 'desc'
+
 export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTableProps) {
   const [editGroup, setEditGroup] = useState<Group | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const handleEdit = (group: Group) => {
     setEditGroup(group)
@@ -48,13 +53,40 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
     }
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedGroups = [...groups].sort((a, b) => {
+    const aValue = a[sortField].toLowerCase()
+    const bValue = b[sortField].toLowerCase()
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
+  })
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="h-4 w-4 inline ml-1" /> : 
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">Responsibility Groups</h2>
       </div>
       <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900">
-        {groups.length === 0 ? (
+        {sortedGroups.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -68,7 +100,7 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700">
               {/* Mobile Card Layout */}
               <div className="sm:hidden">
-                {groups.map((group, index) => (
+                {sortedGroups.map((group, index) => (
                   <motion.div
                     key={group.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -101,17 +133,29 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
               </div>
 
               {/* Desktop Table Layout */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden sm:block">
                 <Table>
-                  <TableHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
-                    <TableRow className="dark:border-gray-700">
-                      <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Name</TableHead>
-                      <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Description</TableHead>
+                  <TableHeader className="bg-gray-100 dark:bg-gray-700">
+                    <TableRow>
+                      <TableHead 
+                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('name')}
+                      >
+                        Name
+                        <SortIcon field="name" />
+                      </TableHead>
+                      <TableHead 
+                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort('description')}
+                      >
+                        Description
+                        <SortIcon field="description" />
+                      </TableHead>
                       <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {groups.map((group, index) => (
+                    {sortedGroups.map((group, index) => (
                       <motion.tr
                         key={group.id}
                         initial={{ opacity: 0, y: 20 }}
