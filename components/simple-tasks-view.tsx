@@ -22,7 +22,9 @@ import {
   Clock,
   AlertCircle,
   ArrowUpDown,
-  ExternalLinkIcon
+  ExternalLinkIcon,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
@@ -57,6 +59,7 @@ type SortOption = 'name-asc' | 'name-desc' | 'created-asc' | 'created-desc' | 'h
 export default function SimpleTasksView({ groups, categories, people, isAdmin }: SimpleTasksViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState("")
   const [selectedCategoryId, setSelectedCategoryId] = useState("all")
+  const [categoryFilter, setCategoryFilter] = useState("all")
   const [tasks, setTasks] = useState<Task[]>([])
   const [taskAllocations, setTaskAllocations] = useState<Record<string, TaskAllocation[]>>({})
   const [forceUpdate, setForceUpdate] = useState<number>(0)
@@ -412,9 +415,9 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
     return [...tasks].sort((a, b) => {
       switch (sortOption) {
         case 'name-asc':
-          return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+          return a.name.localeCompare(b.name)
         case 'name-desc':
-          return b.name.toLowerCase().localeCompare(a.name.toLowerCase())
+          return b.name.localeCompare(a.name)
         case 'created-asc':
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         case 'created-desc':
@@ -429,7 +432,51 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
     })
   }
 
-  const sortedTasks = sortTasks(tasks)
+  // Filter tasks by category
+  const filterTasksByCategory = (tasks: Task[]) => {
+    if (categoryFilter === "all") return tasks
+    return tasks.filter(task => task.categoryId === categoryFilter)
+  }
+
+  const filteredTasks = filterTasksByCategory(tasks)
+  const sortedTasks = sortTasks(filteredTasks)
+
+  const handleSort = (field: string) => {
+    let newSortOption: SortOption
+    
+    if (field === 'name') {
+      newSortOption = sortOption === 'name-asc' ? 'name-desc' : 'name-asc'
+    } else if (field === 'hours') {
+      newSortOption = sortOption === 'hours-asc' ? 'hours-desc' : 'hours-asc'
+    } else if (field === 'created') {
+      newSortOption = sortOption === 'created-asc' ? 'created-desc' : 'created-asc'
+    } else {
+      return
+    }
+    
+    setSortOption(newSortOption)
+  }
+
+  const SortIcon = ({ field }: { field: string }) => {
+    let isActive = false
+    let isAsc = true
+    
+    if (field === 'name') {
+      isActive = sortOption.startsWith('name')
+      isAsc = sortOption === 'name-asc'
+    } else if (field === 'hours') {
+      isActive = sortOption.startsWith('hours')
+      isAsc = sortOption === 'hours-asc'
+    } else if (field === 'created') {
+      isActive = sortOption.startsWith('created')
+      isAsc = sortOption === 'created-asc'
+    }
+    
+    if (!isActive) return null
+    return isAsc ? 
+      <ChevronUp className="h-4 w-4 inline ml-1" /> : 
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -529,10 +576,22 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
               <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="px-4 py-2 text-left font-medium">Name</th>
+                    <th 
+                      className="px-4 py-2 text-left font-medium cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => handleSort('name')}
+                    >
+                      Name
+                      <SortIcon field="name" />
+                    </th>
                     <th className="px-4 py-2 text-left font-medium">Description</th>
                     <th className="px-4 py-2 text-left font-medium">Category</th>
-                    <th className="px-4 py-2 text-left font-medium">Hours/Week</th>
+                    <th 
+                      className="px-4 py-2 text-left font-medium cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => handleSort('hours')}
+                    >
+                      Hours/Week
+                      <SortIcon field="hours" />
+                    </th>
                     <th className="px-4 py-2 text-left font-medium">Source</th>
                     <th className="px-4 py-2 text-left font-medium">Assigned To</th>
                     <th className="px-4 py-2 text-left font-medium">Actions</th>
@@ -629,6 +688,31 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           </ScrollArea>
         )}
       </div>
+
+      {/* Filter Controls */}
+      {selectedGroupId && (
+        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Filter by Category:</label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {filteredCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Showing {filteredTasks.length} of {tasks.length} tasks
+          </div>
+        </div>
+      )}
 
       {/* Dialogs */}
       {isAdmin && (

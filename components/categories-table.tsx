@@ -22,7 +22,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CategoryDialog } from "@/components/category-dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { motion } from "framer-motion"
 
 interface CategoriesTableProps {
   categories: Category[]
@@ -41,6 +50,7 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
   const [alertOpen, setAlertOpen] = useState(false)
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all')
 
   const handleEdit = (category: Category) => {
     setEditCategory(category)
@@ -80,7 +90,12 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
     }
   }
 
-  const sortedCategories = [...categories].sort((a, b) => {
+  // Filter categories by selected group
+  const filteredCategories = selectedGroupId === 'all' 
+    ? categories 
+    : categories.filter(category => category.groupId === selectedGroupId)
+
+  const sortedCategories = [...filteredCategories].sort((a, b) => {
     let aValue: string
     let bValue: string
     
@@ -107,88 +122,119 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
   }
 
   return (
-    <div className="p-4">
-      <div className="rounded-md border">
+    <div className="space-y-4">
+      {/* Filter Controls */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label htmlFor="group-filter" className="text-sm font-medium">
+            Filter by Group:
+          </label>
+          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {groups.map((group) => (
+                <SelectItem key={group.id} value={group.id}>
+                  {group.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredCategories.length} of {categories.length} categories
+        </div>
+      </div>
+
+      <ScrollArea className="h-[600px] rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-gray-100 dark:bg-gray-700">
             <TableRow>
               <TableHead 
-                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => handleSort('name')}
               >
                 Name
                 <SortIcon field="name" />
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => handleSort('description')}
               >
                 Description
                 <SortIcon field="description" />
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-gray-100 transition-colors"
+                className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => handleSort('group')}
               >
                 Group
                 <SortIcon field="group" />
               </TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Source</TableHead>
+              <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedCategories.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                  No categories found. Add a category to get started.
+            {sortedCategories.map((category, index) => (
+              <motion.tr
+                key={category.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+              >
+                <TableCell className="font-medium">{category.name}</TableCell>
+                <TableCell>{category.description}</TableCell>
+                <TableCell>{getGroupName(category.groupId)}</TableCell>
+                <TableCell>
+                  {category.sourceLink ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(category.sourceLink, '_blank')}
+                      className="p-1 h-auto"
+                      title="View source material"
+                    >
+                      <ExternalLinkIcon className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">-</span>
+                  )}
                 </TableCell>
-              </TableRow>
-            ) : (
-              sortedCategories.map((category) => (
-                <TableRow key={category.id}>
-                  <TableCell>{category.name}</TableCell>
-                  <TableCell>{category.description}</TableCell>
-                  <TableCell>{getGroupName(category.groupId)}</TableCell>
-                  <TableCell>
-                    {category.sourceLink ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(category.sourceLink, '_blank')}
-                        className="p-1 h-auto"
-                        title="View source material"
-                      >
-                        <ExternalLinkIcon className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(category)}
+                        className="dark:hover:bg-gray-600"
                       >
-                        <PencilIcon className="h-4 w-4" />
+                        <PencilIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="sr-only">Edit</span>
                       </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(category.id)}
+                        className="dark:hover:bg-gray-600"
                       >
-                        <TrashIcon className="h-4 w-4" />
+                        <TrashIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="sr-only">Delete</span>
                       </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+                    </motion.div>
+                  </div>
+                </TableCell>
+              </motion.tr>
+            ))}
           </TableBody>
         </Table>
-      </div>
+      </ScrollArea>
 
       {/* Edit Category Dialog */}
       <CategoryDialog
@@ -203,18 +249,31 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
       />
 
       <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this category and remove all associated allocations.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent className="shadow-2xl border-none bg-white dark:bg-gray-800 dark:border-gray-700">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-bold text-gray-800 dark:text-white">Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600 dark:text-gray-300">
+                This will permanently delete this category and remove all associated allocations.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-4">
+              <AlertDialogCancel className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white transition-all duration-200">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-200 dark:neon-pink-glow"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </motion.div>
         </AlertDialogContent>
       </AlertDialog>
     </div>
