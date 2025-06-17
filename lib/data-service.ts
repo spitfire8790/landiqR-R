@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation } from "@/lib/types"
+import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, WorkflowTool, Workflow } from "@/lib/types"
 import { v4 as uuidv4 } from "uuid"
 
 // Check if tables exist and create them if they don't
@@ -935,9 +935,9 @@ export async function createTaskAllocation(allocation: Omit<TaskAllocation, "id"
   }
 }
 
-export async function deleteTaskAllocation(id: string): Promise<boolean> {
+export async function deleteTaskAllocation(allocationId: string): Promise<boolean> {
   try {
-    const { error } = await supabase.from("task_allocations").delete().eq("id", id)
+    const { error } = await supabase.from("task_allocations").delete().eq("id", allocationId)
 
     if (error) {
       console.error("Error deleting task allocation:", error)
@@ -946,7 +946,7 @@ export async function deleteTaskAllocation(id: string): Promise<boolean> {
 
     return true
   } catch (error) {
-    console.error("Error in deleteTaskAllocation:", error)
+    console.error("Error deleting task allocation:", error)
     return false
   }
 }
@@ -983,5 +983,266 @@ export async function getPeopleAllocatedToCategory(categoryId: string): Promise<
   } catch (error) {
     console.error("Error in getPeopleAllocatedToCategory:", error)
     return []
+  }
+}
+
+// Workflow Tools
+export async function fetchWorkflowTools(): Promise<WorkflowTool[]> {
+  try {
+    const { data, error } = await supabase
+      .from("workflow_tools")
+      .select("*")
+      .order("category", { ascending: true })
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching workflow tools:", error)
+      return []
+    }
+
+    return data.map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      description: tool.description || "",
+      icon: tool.icon || "",
+      category: tool.category,
+      createdAt: tool.created_at,
+    }))
+  } catch (error) {
+    console.error("Error in fetchWorkflowTools:", error)
+    return []
+  }
+}
+
+export async function createWorkflowTool(tool: Omit<WorkflowTool, "id" | "createdAt">): Promise<WorkflowTool | null> {
+  try {
+    const newTool = {
+      id: uuidv4(),
+      name: tool.name,
+      description: tool.description,
+      icon: tool.icon,
+      category: tool.category,
+      created_at: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabase.from("workflow_tools").insert([newTool]).select().single()
+
+    if (error) {
+      console.error("Error creating workflow tool:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || "",
+      icon: data.icon || "",
+      category: data.category,
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in createWorkflowTool:", error)
+    return null
+  }
+}
+
+export async function updateWorkflowTool(tool: WorkflowTool): Promise<WorkflowTool | null> {
+  try {
+    const { data, error } = await supabase
+      .from("workflow_tools")
+      .update({
+        name: tool.name,
+        description: tool.description,
+        icon: tool.icon,
+        category: tool.category,
+      })
+      .eq("id", tool.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating workflow tool:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || "",
+      icon: data.icon || "",
+      category: data.category,
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in updateWorkflowTool:", error)
+    return null
+  }
+}
+
+export async function deleteWorkflowTool(toolId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("workflow_tools").delete().eq("id", toolId)
+
+    if (error) {
+      console.error("Error deleting workflow tool:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error deleting workflow tool:", error)
+    return false
+  }
+}
+
+// Workflows
+export async function fetchWorkflows(taskId?: string): Promise<Workflow[]> {
+  try {
+    let query = supabase
+      .from("workflows")
+      .select("*")
+      .order("created_at", { ascending: false })
+    
+    if (taskId) {
+      query = query.eq("task_id", taskId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Error fetching workflows:", error)
+      return []
+    }
+
+    return data.map((workflow) => ({
+      id: workflow.id,
+      name: workflow.name,
+      description: workflow.description || "",
+      taskId: workflow.task_id,
+      flowData: workflow.flow_data,
+      isActive: workflow.is_active,
+      createdAt: workflow.created_at,
+      updatedAt: workflow.updated_at,
+    }))
+  } catch (error) {
+    console.error("Error in fetchWorkflows:", error)
+    return []
+  }
+}
+
+export async function fetchWorkflowById(id: string): Promise<Workflow | null> {
+  try {
+    const { data, error } = await supabase
+      .from("workflows")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.error("Error fetching workflow by id:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || "",
+      taskId: data.task_id,
+      flowData: data.flow_data,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    }
+  } catch (error) {
+    console.error("Error in fetchWorkflowById:", error)
+    return null
+  }
+}
+
+export async function createWorkflow(workflow: Omit<Workflow, "id" | "createdAt" | "updatedAt">): Promise<Workflow | null> {
+  try {
+    const newWorkflow = {
+      id: uuidv4(),
+      name: workflow.name,
+      description: workflow.description,
+      task_id: workflow.taskId,
+      flow_data: workflow.flowData,
+      is_active: workflow.isActive,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabase.from("workflows").insert([newWorkflow]).select().single()
+
+    if (error) {
+      console.error("Error creating workflow:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || "",
+      taskId: data.task_id,
+      flowData: data.flow_data,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    }
+  } catch (error) {
+    console.error("Error in createWorkflow:", error)
+    return null
+  }
+}
+
+export async function updateWorkflow(workflow: Workflow): Promise<Workflow | null> {
+  try {
+    const { data, error } = await supabase
+      .from("workflows")
+      .update({
+        name: workflow.name,
+        description: workflow.description,
+        flow_data: workflow.flowData,
+        is_active: workflow.isActive,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", workflow.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating workflow:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || "",
+      taskId: data.task_id,
+      flowData: data.flow_data,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    }
+  } catch (error) {
+    console.error("Error in updateWorkflow:", error)
+    return null
+  }
+}
+
+export async function deleteWorkflow(workflowId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("workflows").delete().eq("id", workflowId)
+
+    if (error) {
+      console.error("Error deleting workflow:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error deleting workflow:", error)
+    return false
   }
 }

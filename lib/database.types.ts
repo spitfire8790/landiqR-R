@@ -167,6 +167,64 @@ export interface Database {
           created_at?: string
         }
       }
+      workflow_tools: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          icon: string | null
+          category: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          category?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          category?: string
+          created_at?: string
+        }
+      }
+      workflows: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          task_id: string
+          flow_data: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          task_id: string
+          flow_data: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          task_id?: string
+          flow_data?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }

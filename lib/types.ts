@@ -64,3 +64,55 @@ export interface Message {
   created_at: string
   author_email: string
 }
+
+// Workflow system types
+export interface WorkflowTool {
+  id: string
+  name: string
+  description: string
+  icon?: string
+  category: string // e.g., 'analysis', 'communication', 'data-processing'
+  createdAt: string
+}
+
+export interface Workflow {
+  id: string
+  name: string
+  description: string
+  taskId: string
+  flowData: string // JSON stringified React Flow data
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WorkflowNode {
+  id: string
+  type: 'person' | 'tool' | 'decision' | 'start' | 'end'
+  position: { x: number; y: number }
+  data: {
+    label: string
+    personId?: string
+    toolId?: string
+    description?: string
+    [key: string]: any
+  }
+}
+
+export interface WorkflowEdge {
+  id: string
+  source: string
+  target: string
+  type?: string
+  label?: string
+  data?: {
+    condition?: string
+    [key: string]: any
+  }
+}
+
+export interface WorkflowData {
+  nodes: WorkflowNode[]
+  edges: WorkflowEdge[]
+  viewport: { x: number; y: number; zoom: number }
+}

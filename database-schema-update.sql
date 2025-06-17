@@ -84,6 +84,79 @@ CREATE POLICY "Enable update for authenticated users" ON public.task_allocations
 CREATE POLICY "Enable delete for authenticated users" ON public.task_allocations
     FOR DELETE USING (true);
 
+-- WORKFLOW SYSTEM TABLES --
+
+-- Create workflow_tools table
+CREATE TABLE IF NOT EXISTS public.workflow_tools (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    category TEXT NOT NULL DEFAULT 'general',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create workflows table
+CREATE TABLE IF NOT EXISTS public.workflows (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+    flow_data TEXT NOT NULL, -- JSON stringified React Flow data
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create indexes for workflow tables
+CREATE INDEX IF NOT EXISTS idx_workflow_tools_category ON public.workflow_tools(category);
+CREATE INDEX IF NOT EXISTS idx_workflows_task_id ON public.workflows(task_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_is_active ON public.workflows(is_active);
+
+-- Enable RLS for workflow tables
+ALTER TABLE public.workflow_tools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workflows ENABLE ROW LEVEL SECURITY;
+
+-- Workflow tools policies
+CREATE POLICY "Enable read access for all users" ON public.workflow_tools
+    FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for authenticated users" ON public.workflow_tools
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Enable update for authenticated users" ON public.workflow_tools
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Enable delete for authenticated users" ON public.workflow_tools
+    FOR DELETE USING (true);
+
+-- Workflows policies
+CREATE POLICY "Enable read access for all users" ON public.workflows
+    FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for authenticated users" ON public.workflows
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Enable update for authenticated users" ON public.workflows
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Enable delete for authenticated users" ON public.workflows
+    FOR DELETE USING (true);
+
+-- Insert some default workflow tools
+INSERT INTO public.workflow_tools (name, description, icon, category) VALUES 
+('Data Analysis', 'Analyze data and generate insights', 'BarChart3', 'analysis'),
+('Email Communication', 'Send and manage email communications', 'Mail', 'communication'),
+('Document Review', 'Review and approve documents', 'FileText', 'review'),
+('Database Query', 'Query and extract data from databases', 'Database', 'data-processing'),
+('Report Generation', 'Generate reports and summaries', 'FileOutput', 'reporting'),
+('Quality Check', 'Perform quality assurance checks', 'CheckCircle2', 'quality'),
+('Approval Process', 'Handle approvals and sign-offs', 'Stamp', 'approval'),
+('Data Validation', 'Validate data integrity and accuracy', 'Shield', 'validation'),
+('Notification System', 'Send notifications and alerts', 'Bell', 'communication'),
+('File Processing', 'Process and transform files', 'FileProcessing', 'data-processing')
+ON CONFLICT DO NOTHING;
+
 -- Optional: Add some sample data for testing
 -- Uncomment the following if you want to add test data
 
