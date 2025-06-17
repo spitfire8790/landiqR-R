@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import type { TaskAllocation, Person } from "@/lib/types"
 
 interface TaskAllocationDialogProps {
@@ -30,7 +31,7 @@ interface TaskAllocationDialogProps {
   allocation?: TaskAllocation
 }
 
-export function TaskAllocationDialog({
+export default function TaskAllocationDialog({
   open,
   onOpenChange,
   onSave,
@@ -40,14 +41,17 @@ export function TaskAllocationDialog({
 }: TaskAllocationDialogProps) {
   const [personId, setPersonId] = useState("")
   const [isLead, setIsLead] = useState(false)
+  const [estimatedWeeklyHours, setEstimatedWeeklyHours] = useState(0)
 
   useEffect(() => {
     if (allocation) {
       setPersonId(allocation.personId)
       setIsLead(allocation.isLead || false)
+      setEstimatedWeeklyHours(allocation.estimatedWeeklyHours)
     } else {
       setPersonId("")
       setIsLead(false)
+      setEstimatedWeeklyHours(0)
     }
   }, [allocation, open])
 
@@ -58,6 +62,7 @@ export function TaskAllocationDialog({
         taskId,
         personId,
         isLead,
+        estimatedWeeklyHours,
       })
       onOpenChange(false)
     }
@@ -84,12 +89,12 @@ export function TaskAllocationDialog({
               <Label htmlFor="person" className="text-right">
                 Person
               </Label>
-              <Select value={personId} onValueChange={setPersonId} required>
+              <Select value={personId} onValueChange={setPersonId}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a person" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availablePeople.map((person) => (
+                  {availablePeople.sort((a, b) => a.name.localeCompare(b.name)).map((person) => (
                     <SelectItem key={person.id} value={person.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{person.name}</span>
@@ -112,8 +117,24 @@ export function TaskAllocationDialog({
             )}
 
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="estimatedWeeklyHours" className="text-right">
+                Weekly Hours
+              </Label>
+              <Input
+                id="estimatedWeeklyHours"
+                type="number"
+                min="0"
+                step="0.5"
+                value={estimatedWeeklyHours}
+                onChange={(e) => setEstimatedWeeklyHours(Number(e.target.value))}
+                className="col-span-3"
+                placeholder="Estimated weekly hours"
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="isLead" className="text-right">
-                Task Lead
+                Team Lead
               </Label>
               <div className="col-span-3 flex items-center space-x-2">
                 <Checkbox
@@ -122,7 +143,7 @@ export function TaskAllocationDialog({
                   onCheckedChange={(checked) => setIsLead(checked as boolean)}
                 />
                 <Label htmlFor="isLead" className="text-sm font-normal">
-                  This person is the task lead
+                  This person is the team lead for this task
                 </Label>
               </div>
             </div>

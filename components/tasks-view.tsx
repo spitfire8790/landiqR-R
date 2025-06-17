@@ -78,12 +78,21 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
 
   const { toast } = useToast()
 
-  // Get categories for selected group
-  const filteredCategories = categories.filter(cat => cat.groupId === selectedGroupId)
+  // Get categories for selected group (sorted alphabetically)
+  const filteredCategories = categories
+    .filter(cat => cat.groupId === selectedGroupId)
+    .sort((a, b) => a.name.localeCompare(b.name))
 
-  // Load tasks when category is selected
+  // Get all categories (sorted alphabetically) for independent filtering
+  const allCategories = categories.sort((a, b) => a.name.localeCompare(b.name))
+
+  // Load tasks when category is selected or when showing all tasks
   useEffect(() => {
-    if (selectedCategoryId) {
+    if (selectedCategoryId === "all") {
+      // Load all tasks
+      loadTasksForCategory()
+    } else if (selectedCategoryId) {
+      // Load tasks for specific category
       loadTasksForCategory(selectedCategoryId)
       loadAvailablePeople(selectedCategoryId)
     } else {
@@ -94,7 +103,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     }
   }, [selectedCategoryId])
 
-  const loadTasksForCategory = async (categoryId: string) => {
+  const loadTasksForCategory = async (categoryId?: string) => {
     setLoading(true)
     try {
       const tasksData = await fetchTasksByCategory(categoryId)
@@ -355,10 +364,10 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
         <div className="flex-1">
           <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
             <SelectTrigger>
-              <SelectValue placeholder="Select a group" />
+              <SelectValue placeholder="Select a group (optional)" />
             </SelectTrigger>
             <SelectContent>
-              {groups.map((group) => (
+              {groups.sort((a, b) => a.name.localeCompare(b.name)).map((group) => (
                 <SelectItem key={group.id} value={group.id}>
                   {group.name}
                 </SelectItem>
@@ -371,18 +380,27 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
           <Select 
             value={selectedCategoryId} 
             onValueChange={setSelectedCategoryId}
-            disabled={!selectedGroupId}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {filteredCategories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
+              {selectedGroupId ? (
+                // Show categories for selected group
+                filteredCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))
+              ) : (
+                // Show all categories when no group is selected
+                allCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>

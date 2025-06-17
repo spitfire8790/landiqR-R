@@ -108,9 +108,9 @@ export function ResponsibilityDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No one assigned</SelectItem>
-                  {availablePeople.map((person) => (
+                  {availablePeople.sort((a, b) => a.name.localeCompare(b.name)).map((person) => (
                     <SelectItem key={person.id} value={person.id}>
-                      {person.name} - {person.organisation}
+                      {person.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

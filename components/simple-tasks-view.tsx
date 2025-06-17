@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils"
 import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
 import { SimpleTaskDialog } from "@/components/simple-task-dialog"
 import { ResponsibilityDialog } from "@/components/responsibility-dialog"
-import { TaskAllocationDialog } from "@/components/task-allocation-dialog"
+import TaskAllocationDialog from "@/components/task-allocation-dialog"
 import {
   fetchTasksByCategory,
   fetchResponsibilities,
@@ -515,7 +515,7 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin, o
                 <SelectValue placeholder="Select a group" />
               </SelectTrigger>
               <SelectContent>
-                {groups.map((group) => (
+                {groups.sort((a, b) => a.name.localeCompare(b.name)).map((group) => (
                   <SelectItem key={group.id} value={group.id}>
                     {group.name}
                   </SelectItem>
@@ -536,7 +536,7 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin, o
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {filteredCategories.map((category) => (
+                {filteredCategories.sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
@@ -716,7 +716,7 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin, o
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {filteredCategories.map((category) => (
+                {filteredCategories.sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
