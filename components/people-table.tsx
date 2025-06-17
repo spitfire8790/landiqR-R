@@ -95,11 +95,11 @@ export default function PeopleTable({ people, onEdit, onDelete }: PeopleTablePro
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">People</h2>
       </div>
-      <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900 w-full">
         {sortedPeople.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -110,9 +110,9 @@ export default function PeopleTable({ people, onEdit, onDelete }: PeopleTablePro
             <p className="text-xs sm:text-sm text-gray-400 dark:text-gray-500">Add your first person to get started.</p>
           </motion.div>
         ) : (
-          <ScrollArea className="h-full">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700">
-              <Table>
+          <ScrollArea className="h-full w-full">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full">
+              <Table className="w-full">
                 <TableHeader className="bg-gray-100 dark:bg-gray-700">
                   <TableRow>
                     <TableHead 

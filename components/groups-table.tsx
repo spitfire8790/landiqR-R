@@ -81,11 +81,11 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">Responsibility Groups</h2>
       </div>
-      <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900 w-full">
         {sortedGroups.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -96,8 +96,8 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
             <p className="text-xs sm:text-sm text-gray-400 dark:text-gray-500">Add your first group to get started.</p>
           </motion.div>
         ) : (
-          <ScrollArea className="h-full">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700">
+          <ScrollArea className="h-full w-full">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full">
               {/* Mobile Card Layout */}
               <div className="sm:hidden">
                 {sortedGroups.map((group, index) => (

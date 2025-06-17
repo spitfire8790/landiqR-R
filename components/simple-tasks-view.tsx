@@ -479,7 +479,7 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-4">Tasks & Responsibilities</h2>
@@ -559,7 +559,7 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden p-4 bg-gray-50">
+      <div className="flex-1 overflow-hidden p-4 bg-gray-50 w-full">
         {!selectedCategoryId ? (
           <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -571,9 +571,9 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
             <p className="text-gray-500">Loading tasks...</p>
           </div>
         ) : (
-          <ScrollArea className="h-full">
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+          <ScrollArea className="h-full w-full">
+            <div className="overflow-x-auto w-full">
+              <table className="min-w-full bg-white border border-gray-200 rounded-lg w-full">
                 <thead>
                   <tr className="border-b bg-gray-50">
                     <th 

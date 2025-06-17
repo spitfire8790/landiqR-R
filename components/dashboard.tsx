@@ -498,9 +498,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between w-full">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold text-gray-900">
             Land iQ Responsibility Allocation
@@ -576,8 +576,8 @@ export default function Dashboard() {
       </div>
 
       {/* Custom Tab Navigation */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="flex overflow-x-auto scrollbar-hide">
+      <div className="border-b border-gray-200 bg-white w-full">
+        <div className="flex overflow-x-auto scrollbar-hide w-full">
           <button
             onClick={() => setActiveTab("orgchart")}
             className={cn(
@@ -657,9 +657,9 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden bg-white">
+      <div className="flex-1 overflow-hidden bg-white w-full">
         {activeTab === "orgchart" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <OrgChart
               groups={groups}
               categories={categories}
@@ -679,7 +679,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === "groups" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <GroupsTable
               groups={groups}
               onEdit={isAdmin ? updateGroupHandler : () => {}}
@@ -689,7 +689,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === "categories" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <CategoriesTable
               categories={categories}
               groups={groups}
@@ -700,7 +700,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === "people" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <PeopleTable
               people={people}
               onEdit={isAdmin ? updatePersonHandler : () => {}}
@@ -710,7 +710,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === "tasks" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <SimpleTasksView
               groups={groups}
               categories={categories}
@@ -721,7 +721,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === "analytics" && (
-          <div className="h-full">
+          <div className="h-full w-full">
             <ResponsibilityChart people={people} allocations={allocations} />
           </div>
         )}
