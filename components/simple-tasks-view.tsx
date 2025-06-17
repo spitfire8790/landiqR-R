@@ -52,11 +52,12 @@ interface SimpleTasksViewProps {
   categories: Category[]
   people: Person[]
   isAdmin: boolean
+  onDataChange?: () => void
 }
 
 type SortOption = 'name-asc' | 'name-desc' | 'created-asc' | 'created-desc' | 'hours-asc' | 'hours-desc'
 
-export default function SimpleTasksView({ groups, categories, people, isAdmin }: SimpleTasksViewProps) {
+export default function SimpleTasksView({ groups, categories, people, isAdmin, onDataChange }: SimpleTasksViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState("")
   const [selectedCategoryId, setSelectedCategoryId] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -146,11 +147,18 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
     try {
       const newTask = await createTask(taskData)
       if (newTask) {
-        setTasks(prev => [...prev, newTask])
-        setTaskAllocations(prev => ({ ...prev, [newTask.id]: [] }))
+        setTasks([...tasks, newTask])
+        setTaskAllocations({
+          ...taskAllocations,
+          [newTask.id]: [],
+        })
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange()
+
         toast({
-          title: "Success",
-          description: "Task created successfully.",
+          title: "Task created",
+          description: `Task "${newTask.name}" has been created.`,
         })
       }
     } catch (error) {
@@ -203,6 +211,9 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           // Also refresh from database to ensure everything is in sync
           await loadTasksForCategory(selectedCategoryId === "all" ? undefined : selectedCategoryId);
 
+          // Notify parent component to refresh data
+          if (onDataChange) onDataChange()
+
           toast({
             title: "Success",
             description: "Task updated successfully",
@@ -242,6 +253,9 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           // Also refresh from database to ensure everything is in sync
           await loadTasksForCategory(selectedCategoryId === "all" ? undefined : selectedCategoryId);
           console.log("Tasks reloaded after creation");
+
+          // Notify parent component to refresh data
+          if (onDataChange) onDataChange()
 
           toast({
             title: "Success",
@@ -340,9 +354,13 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           delete newAllocations[taskId]
           return newAllocations
         })
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange()
+
         toast({
-          title: "Success",
-          description: "Task deleted successfully.",
+          title: "Task deleted",
+          description: "Task has been deleted.",
         })
       }
     } catch (error) {
@@ -363,9 +381,13 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           ...prev,
           [allocationData.taskId]: [...(prev[allocationData.taskId] || []), newAllocation]
         }))
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange()
+
         toast({
-          title: "Success",
-          description: "Task allocation created successfully.",
+          title: "Person allocated",
+          description: `${getPersonName(newAllocation.personId)} has been allocated to the task.`,
         })
       }
     } catch (error) {
@@ -574,29 +596,23 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
           <ScrollArea className="h-full w-full">
             <div className="overflow-x-auto w-full">
               <table className="min-w-full bg-white border border-gray-200 rounded-lg w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th 
-                      className="px-4 py-2 text-left font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => handleSort('name')}
-                    >
-                      Name
-                      <SortIcon field="name" />
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium">Description</th>
-                    <th className="px-4 py-2 text-left font-medium">Category</th>
-                    <th 
-                      className="px-4 py-2 text-left font-medium cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => handleSort('hours')}
-                    >
-                      Hours/Week
-                      <SortIcon field="hours" />
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium">Source</th>
-                    <th className="px-4 py-2 text-left font-medium">Assigned To</th>
-                    <th className="px-4 py-2 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
+                <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-20 shadow-sm">
+  <tr className="border-b bg-gray-100 dark:bg-gray-700">
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" onClick={() => handleSort('name')}>
+      Task Name
+      <SortIcon field="name" />
+    </th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" onClick={() => handleSort('description')}>
+      Description
+      <SortIcon field="description" />
+    </th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20">Category</th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20">Hours/Week</th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20">Source</th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20">Assigned To</th>
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 sticky top-0 z-20">Actions</th>
+  </tr>
+</thead>
                 <tbody>
                   {sortedTasks.map((task) => {
                     const allocations = taskAllocations[task.id] || []
@@ -619,66 +635,66 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
                     return (
                       <tr key={task.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium">{task.name}</td>
-                        <td className="px-4 py-2">{task.description}</td>
-                        <td className="px-4 py-2">{category ? category.name : "-"}</td>
-                        <td className="px-4 py-2">{task.hoursPerWeek}</td>
-                        <td className="px-4 py-2">
-                          {task.sourceLink ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(task.sourceLink, '_blank')}
-                              className="p-1 h-auto"
-                              title="View source material"
-                            >
-                              <ExternalLinkIcon className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex flex-wrap gap-1">
-                            {allocations.length > 0 ? (
-                              allocations.map((allocation) => {
-                                const personName = getPersonName(allocation.personId)
-                                const orgColor = getOrgColor(allocation.personId)
-                                return (
-                                  <span
-                                    key={allocation.id}
-                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white"
-                                    style={{ backgroundColor: orgColor }}
-                                  >
-                                    {personName}
-                                  </span>
-                                )
-                              })
-                            ) : (
-                              <span className="text-gray-400 text-sm">Unassigned</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingTask(task)
-                                setTaskDialogOpen(true)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteTask(task.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
+<td className="px-4 py-2">{task.description}</td>
+<td className="px-4 py-2">{category ? category.name : "-"}</td>
+<td className="px-4 py-2">{task.hoursPerWeek}</td>
+<td className="px-4 py-2">
+  {task.sourceLink ? (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => window.open(task.sourceLink, '_blank')}
+      className="p-1 h-auto"
+      title="View source material"
+    >
+      <ExternalLinkIcon className="h-4 w-4" />
+    </Button>
+  ) : (
+    <span className="text-muted-foreground text-sm">-</span>
+  )}
+</td>
+<td className="px-4 py-2">
+  <div className="flex flex-wrap gap-1">
+    {allocations.length > 0 ? (
+      allocations.map((allocation) => {
+        const personName = getPersonName(allocation.personId)
+        const orgColor = getOrgColor(allocation.personId)
+        return (
+          <span
+            key={allocation.id}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white"
+            style={{ backgroundColor: orgColor }}
+          >
+            {personName}
+          </span>
+        )
+      })
+    ) : (
+      <span className="text-gray-400 text-sm">Unassigned</span>
+    )}
+  </div>
+</td>
+<td className="px-4 py-2">
+  <div className="flex gap-2">
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        setEditingTask(task)
+        setTaskDialogOpen(true)
+      }}
+    >
+      <Edit className="h-4 w-4" />
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => handleDeleteTask(task.id)}
+    >
+      <Trash2 className="h-4 w-4" />
+    </Button>
+  </div>
+</td>
                       </tr>
                     )
                   })}

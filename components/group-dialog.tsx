@@ -1,13 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Group } from "@/lib/types"
 import { motion } from "framer-motion"
+import * as LucideIcons from "lucide-react"
+
+// Popular icons suitable for groups
+const AVAILABLE_ICONS = [
+  { name: "Folder", label: "Folder" },
+  { name: "Users", label: "Users" },
+  { name: "Building", label: "Building" },
+  { name: "Briefcase", label: "Briefcase" },
+  { name: "Target", label: "Target" },
+  { name: "Layers", label: "Layers" },
+  { name: "Settings", label: "Settings" },
+  { name: "Shield", label: "Shield" },
+  { name: "Zap", label: "Zap" },
+  { name: "Globe", label: "Globe" },
+  { name: "Heart", label: "Heart" },
+  { name: "Star", label: "Star" },
+  { name: "Truck", label: "Truck" },
+  { name: "Home", label: "Home" },
+  { name: "Factory", label: "Factory" },
+  { name: "Wrench", label: "Wrench" },
+  { name: "Database", label: "Database" },
+  { name: "Network", label: "Network" },
+  { name: "Cpu", label: "CPU" },
+  { name: "Lightbulb", label: "Lightbulb" },
+]
 
 interface GroupDialogProps {
   open: boolean
@@ -19,7 +45,18 @@ interface GroupDialogProps {
 export function GroupDialog({ open, onOpenChange, onSave, defaultValues }: GroupDialogProps) {
   const [name, setName] = useState(defaultValues?.name || "")
   const [description, setDescription] = useState(defaultValues?.description || "")
+  const [icon, setIcon] = useState(defaultValues?.icon || "Folder")
   const [error, setError] = useState("")
+
+  // Reset form when dialog opens or defaultValues change
+  useEffect(() => {
+    if (open) {
+      setName(defaultValues?.name || "")
+      setDescription(defaultValues?.description || "")
+      setIcon(defaultValues?.icon || "Folder")
+      setError("")
+    }
+  }, [open, defaultValues])
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -31,14 +68,19 @@ export function GroupDialog({ open, onOpenChange, onSave, defaultValues }: Group
       id: defaultValues?.id || "",
       name,
       description,
+      icon,
     })
 
     // Reset form
     setName("")
     setDescription("")
+    setIcon("Folder")
     setError("")
     onOpenChange(false)
   }
+
+  // Get the icon component for preview
+  const IconComponent = (LucideIcons as any)[icon] || (LucideIcons as any)["Folder"]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,6 +128,34 @@ export function GroupDialog({ open, onOpenChange, onSave, defaultValues }: Group
                 rows={3}
                 className="border-gray-300 focus:ring-2 focus:ring-gray-800 focus:border-gray-800 shadow-sm transition-all duration-200"
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="icon" className="text-sm font-medium">
+                Icon
+              </Label>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg border">
+                  <IconComponent className="h-5 w-5 text-gray-700" />
+                </div>
+                <Select value={icon} onValueChange={setIcon}>
+                  <SelectTrigger className="flex-1 border-gray-300 focus:ring-2 focus:ring-gray-800 focus:border-gray-800">
+                    <SelectValue placeholder="Select an icon" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {AVAILABLE_ICONS.map((iconOption) => {
+                      const OptionIcon = (LucideIcons as any)[iconOption.name]
+                      return (
+                        <SelectItem key={iconOption.name} value={iconOption.name}>
+                          <div className="flex items-center gap-2">
+                            <OptionIcon className="h-4 w-4" />
+                            <span>{iconOption.label}</span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -113,37 +113,37 @@ export default function PeopleTable({ people, onEdit, onDelete }: PeopleTablePro
           <ScrollArea className="h-full w-full">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full">
               <Table className="w-full">
-                <TableHeader className="bg-gray-100 dark:bg-gray-700">
+                <TableHeader className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <TableRow>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('name')}
                     >
                       Name
                       <SortIcon field="name" />
                     </TableHead>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('email')}
                     >
                       Email
                       <SortIcon field="email" />
                     </TableHead>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('organisation')}
                     >
                       Organisation
                       <SortIcon field="organisation" />
                     </TableHead>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('role')}
                     >
                       Role
                       <SortIcon field="role" />
                     </TableHead>
-                    <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300">Actions</TableHead>
+                    <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

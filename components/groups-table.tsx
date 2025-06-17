@@ -135,23 +135,23 @@ export default function GroupsTable({ groups, onEdit, onDelete }: GroupsTablePro
               {/* Desktop Table Layout */}
               <div className="hidden sm:block">
                 <Table>
-                  <TableHeader className="bg-gray-100 dark:bg-gray-700">
+                  <TableHeader className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
                     <TableRow>
                       <TableHead 
-                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                         onClick={() => handleSort('name')}
                       >
-                        Name
-                        <SortIcon field="name" />
+                        Name <SortIcon field="name" />
                       </TableHead>
                       <TableHead 
-                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                         onClick={() => handleSort('description')}
                       >
-                        Description
-                        <SortIcon field="description" />
+                        Description <SortIcon field="description" />
                       </TableHead>
-                      <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300">Actions</TableHead>
+                      <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

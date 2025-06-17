@@ -21,6 +21,7 @@ export async function ensureTablesExist() {
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
           name TEXT NOT NULL,
           description TEXT,
+          icon TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
@@ -155,6 +156,7 @@ export async function fetchGroups(): Promise<Group[]> {
       id: group.id,
       name: group.name,
       description: group.description || "",
+      icon: group.icon || "Folder",
     }))
   } catch (error) {
     console.error("Error in fetchGroups:", error)
@@ -168,6 +170,7 @@ export async function createGroup(group: Omit<Group, "id">): Promise<Group | nul
       id: uuidv4(),
       name: group.name,
       description: group.description,
+      icon: group.icon,
       created_at: new Date().toISOString(),
     }
 
@@ -187,6 +190,7 @@ export async function createGroup(group: Omit<Group, "id">): Promise<Group | nul
       id: data.id,
       name: data.name,
       description: data.description || "",
+      icon: data.icon || "Folder",
     }
   } catch (error) {
     console.error("Error in createGroup:", error)
@@ -201,6 +205,7 @@ export async function updateGroup(group: Group): Promise<Group | null> {
       .update({
         name: group.name,
         description: group.description,
+        icon: group.icon,
       })
       .eq("id", group.id)
       .select()
@@ -215,6 +220,7 @@ export async function updateGroup(group: Group): Promise<Group | null> {
       id: data.id,
       name: data.name,
       description: data.description || "",
+      icon: data.icon || "Folder",
     }
   } catch (error) {
     console.error("Error in updateGroup:", error)

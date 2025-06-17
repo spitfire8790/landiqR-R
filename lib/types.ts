@@ -2,6 +2,7 @@ export interface Group {
   id: string
   name: string
   description: string
+  icon?: string // Icon name for the group
 }
 
 export interface Category {

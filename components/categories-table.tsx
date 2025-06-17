@@ -165,31 +165,31 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
           <ScrollArea className="h-full w-full">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full">
               <Table className="w-full">
-                <TableHeader className="bg-gray-100 dark:bg-gray-700">
+                <TableHeader className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <TableRow>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('name')}
                     >
                       Name
                       <SortIcon field="name" />
                     </TableHead>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('description')}
                     >
                       Description
                       <SortIcon field="description" />
                     </TableHead>
                     <TableHead 
-                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
                       onClick={() => handleSort('group')}
                     >
                       Group
                       <SortIcon field="group" />
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Source</TableHead>
-                    <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300">Actions</TableHead>
+                    <TableHead className="font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">Source</TableHead>
+                    <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

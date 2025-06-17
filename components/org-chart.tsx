@@ -188,7 +188,7 @@ function GroupContainer({
           items={categories.map((c) => `category-${c.id}`)}
           strategy={horizontalListSortingStrategy}
         >
-          <div className="flex gap-2 mt-0">
+          <div className="flex gap-2 mt-3">
             {categories.map((category) => (
               <SortableCategory key={category.id} category={category}>
                 <motion.div
@@ -249,10 +249,19 @@ export default function OrgChart({
     string | null
   >(null);
   const [categoryTasks, setCategoryTasks] = useState<Task[]>([]);
-  const [taskAllocations, setTaskAllocations] = useState<
-    Record<string, TaskAllocation[]>
-  >({});
+  const [taskAllocations, setTaskAllocations] = useState<{
+    [taskId: string]: TaskAllocation[];
+  }>({});
   const [loadingTasks, setLoadingTasks] = useState(false);
+
+  // State for all tasks and task allocations (for permanent display)
+  const [allTasksByCategoryId, setAllTasksByCategoryId] = useState<{
+    [categoryId: string]: Task[];
+  }>({});
+  const [allTaskAllocationsByTaskId, setAllTaskAllocationsByTaskId] = useState<{
+    [taskId: string]: TaskAllocation[];
+  }>({});
+  const [loadingAllTasks, setLoadingAllTasks] = useState(false);
 
   // State for drag and drop ordering
   const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
@@ -293,6 +302,13 @@ export default function OrgChart({
     setHighlightedCategory(null);
     setHighlightedOrg(null);
   }, [categories, groups]);
+  
+  // Load all tasks and task allocations when component mounts or categories change
+  useEffect(() => {
+    if (categories.length > 0) {
+      loadAllTasksAndAllocations();
+    }
+  }, [categories]);
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -398,6 +414,76 @@ export default function OrgChart({
     return highlightedCategory === categoryId || highlightedOrg === org;
   };
 
+  // Get people from task allocations for a specific category and organization
+  const getPeopleFromTaskAllocations = (categoryId: string, org: string) => {
+    // First check if we have the selected category data loaded
+    if (selectedCategoryForTasks === categoryId && categoryTasks.length > 0) {
+      // Use the selected category data
+      const taskIds = categoryTasks.map(task => task.id);
+      
+      // Get all people IDs from task allocations for these tasks
+      const personIds = new Set<string>();
+      taskIds.forEach(taskId => {
+        const allocations = taskAllocations[taskId] || [];
+        allocations.forEach(allocation => {
+          personIds.add(allocation.personId);
+        });
+      });
+
+      // Filter people by organization and return allocation-like objects
+      return Array.from(personIds)
+        .map(personId => {
+          const person = people.find(p => p.id === personId);
+          if (!person || person.organisation !== org) return null;
+          
+          // Create a synthetic allocation object for rendering
+          return {
+            id: `task-${personId}-${categoryId}`,
+            personId,
+            categoryId,
+            isLead: false, // We don't have lead info from task allocations
+            person
+          };
+        })
+        .filter(Boolean) as { id: string; personId: string; categoryId: string; isLead: boolean; person: Person }[];
+    } 
+    // Otherwise, check if we have all tasks data loaded
+    else if (allTasksByCategoryId[categoryId] && allTasksByCategoryId[categoryId].length > 0) {
+      // Use the all tasks data
+      const tasks = allTasksByCategoryId[categoryId];
+      const taskIds = tasks.map(task => task.id);
+      
+      // Get all people IDs from task allocations for these tasks
+      const personIds = new Set<string>();
+      taskIds.forEach(taskId => {
+        const allocations = allTaskAllocationsByTaskId[taskId] || [];
+        allocations.forEach(allocation => {
+          personIds.add(allocation.personId);
+        });
+      });
+
+      // Filter people by organization and return allocation-like objects
+      return Array.from(personIds)
+        .map(personId => {
+          const person = people.find(p => p.id === personId);
+          if (!person || person.organisation !== org) return null;
+          
+          // Create a synthetic allocation object for rendering
+          return {
+            id: `task-${personId}-${categoryId}`,
+            personId,
+            categoryId,
+            isLead: false, // We don't have lead info from task allocations
+            person
+          };
+        })
+        .filter(Boolean) as { id: string; personId: string; categoryId: string; isLead: boolean; person: Person }[];
+    }
+    
+    // If no data is available, return empty array
+    return [];
+  };
+
   // Helper function to extract first name
   const getFirstName = (fullName: string) => {
     return fullName.split(" ")[0];
@@ -426,6 +512,35 @@ export default function OrgChart({
     }
   };
 
+  // Load all tasks and task allocations for all categories
+  const loadAllTasksAndAllocations = async () => {
+    if (categories.length === 0) return;
+    
+    setLoadingAllTasks(true);
+    try {
+      const tasksByCategoryId: Record<string, Task[]> = {};
+      const allocationsByTaskId: Record<string, TaskAllocation[]> = {};
+      
+      // Load tasks for each category
+      for (const category of categories) {
+        const tasksData = await fetchTasksByCategory(category.id);
+        tasksByCategoryId[category.id] = tasksData;
+        
+        // Load allocations for each task
+        for (const task of tasksData) {
+          const allocations = await fetchTaskAllocations(task.id);
+          allocationsByTaskId[task.id] = allocations;
+        }
+      }
+      
+      setAllTasksByCategoryId(tasksByCategoryId);
+      setAllTaskAllocationsByTaskId(allocationsByTaskId);
+    } catch (error) {
+      console.error("Error loading all tasks and allocations:", error);
+    } finally {
+      setLoadingAllTasks(false);
+    }
+  };
   // Handle category click for tasks
   const handleCategoryClickForTasks = (categoryId: string) => {
     if (selectedCategoryForTasks === categoryId) {
@@ -751,11 +866,27 @@ export default function OrgChart({
                                             className="flex gap-2"
                                           >
                                             {groupCategories.map((category) => {
-                                              const cellAllocations =
-                                                getAllocationsForCategoryAndOrg(
-                                                  category.id,
-                                                  org
-                                                );
+                                              // Get allocations for this cell
+                                              // Always show both direct allocations and task allocations
+                                              const directAllocations = getAllocationsForCategoryAndOrg(
+                                                category.id,
+                                                org
+                                              );
+                                              const taskAllocations = getPeopleFromTaskAllocations(
+                                                category.id,
+                                                org
+                                              );
+                                              
+                                              // Combine both types of allocations, avoiding duplicates
+                                              const allAllocations = [...directAllocations];
+                                              taskAllocations.forEach(taskAlloc => {
+                                                // Only add if person isn't already in direct allocations
+                                                if (!directAllocations.some(directAlloc => directAlloc.personId === taskAlloc.personId)) {
+                                                  allAllocations.push(taskAlloc);
+                                                }
+                                              });
+                                              
+                                              const cellAllocations = allAllocations;
                                               const isHighlighted =
                                                 isCellHighlighted(
                                                   category.id,
@@ -1001,8 +1132,17 @@ export default function OrgChart({
                                                       (allocation) => (
                                                         <Badge
                                                           key={allocation.id}
-                                                          variant="secondary"
-                                                          className="text-xs"
+                                                          variant="outline"
+                                                          className={cn(
+                                                            "text-xs",
+                                                            // Get the person to determine their organization
+                                                            (() => {
+                                                              const person = people.find(p => p.id === allocation.personId);
+                                                              if (!person) return "";
+                                                              // Use the getOrgColor function to get the appropriate color class
+                                                              return getOrgColor(person.organisation, false);
+                                                            })()
+                                                          )}
                                                         >
                                                           {getPersonNameForTask(
                                                             allocation.personId

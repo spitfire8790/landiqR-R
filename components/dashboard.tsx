@@ -66,6 +66,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializingDb, setInitializingDb] = useState(false);
+  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0); // Trigger for data refresh
 
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -132,7 +133,14 @@ export default function Dashboard() {
     }
 
     initializeAndLoadData();
-  }, [toast]);
+  }, [dataRefreshTrigger, toast]); // Re-fetch data when dataRefreshTrigger changes
+
+  // This useEffect was added incorrectly in the previous edit, removing it
+
+  // Function to refresh data
+  const refreshData = () => {
+    setDataRefreshTrigger(prev => prev + 1);
+  };
 
   // Function to manually initialize the database
   const initializeDatabase = async () => {
@@ -716,6 +724,7 @@ export default function Dashboard() {
               categories={categories}
               people={people}
               isAdmin={isAdmin}
+              onDataChange={refreshData}
             />
           </div>
         )}
