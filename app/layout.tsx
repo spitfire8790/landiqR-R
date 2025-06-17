@@ -3,7 +3,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth-context";
-import ChatPanel from "@/components/chat-panel";
 
 export const metadata: Metadata = {
   title: "Land iQ - Roles and Responsibilities",
@@ -28,7 +27,6 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
-            <ChatPanel />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

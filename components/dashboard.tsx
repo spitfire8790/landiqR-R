@@ -15,12 +15,14 @@ import {
   UserPlus,
   ListPlus,
   CheckSquare,
+  MessageCircle,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
 import { PersonDialog } from "@/components/person-dialog";
 import { AllocationDialog } from "@/components/allocation-dialog";
 import { SimpleTaskDialog } from "@/components/simple-task-dialog";
+import DraggableChatModal from "@/components/draggable-chat-modal";
 import { useAuth } from "@/contexts/auth-context";
 import type { Person, Category, Allocation, Group, Task } from "@/lib/types";
 import OrgChart from "@/components/org-chart";
@@ -72,6 +74,7 @@ export default function Dashboard() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("orgchart");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
 
   const { toast } = useToast();
   const { logout, isAdmin, userRole } = useAuth();
@@ -550,6 +553,14 @@ export default function Dashboard() {
                 <CheckSquare className="mr-2 h-4 w-4" />
                 Add Task
               </Button>
+              <Button
+                onClick={() => setChatModalOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Chat
+              </Button>
             </>
           )}
           <Button
@@ -753,6 +764,11 @@ export default function Dashboard() {
             categories={categories}
             availablePeople={people}
             existingAllocations={[]}
+          />
+
+          <DraggableChatModal
+            open={chatModalOpen}
+            onOpenChange={setChatModalOpen}
           />
         </>
       )}

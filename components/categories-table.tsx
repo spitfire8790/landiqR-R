@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { Category, Group } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { PencilIcon, TrashIcon, ChevronUp, ChevronDown } from "lucide-react"
+import { PencilIcon, TrashIcon, ChevronUp, ChevronDown, ExternalLinkIcon } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -133,13 +133,14 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
                 Group
                 <SortIcon field="group" />
               </TableHead>
+              <TableHead>Source</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedCategories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
                   No categories found. Add a category to get started.
                 </TableCell>
               </TableRow>
@@ -149,6 +150,21 @@ export default function CategoriesTable({ categories, groups, onEdit, onDelete }
                   <TableCell>{category.name}</TableCell>
                   <TableCell>{category.description}</TableCell>
                   <TableCell>{getGroupName(category.groupId)}</TableCell>
+                  <TableCell>
+                    {category.sourceLink ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(category.sourceLink, '_blank')}
+                        className="p-1 h-auto"
+                        title="View source material"
+                      >
+                        <ExternalLinkIcon className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button

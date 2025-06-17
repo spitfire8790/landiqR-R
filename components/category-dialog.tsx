@@ -21,6 +21,7 @@ interface CategoryDialogProps {
 export function CategoryDialog({ open, onOpenChange, onSave, defaultValues, groups = [] }: CategoryDialogProps) {
   const [name, setName] = useState(defaultValues?.name || "")
   const [description, setDescription] = useState(defaultValues?.description || "")
+  const [sourceLink, setSourceLink] = useState(defaultValues?.sourceLink || "")
   const [groupId, setGroupId] = useState(defaultValues?.groupId || "")
   const [errors, setErrors] = useState<Record<string, string>>({})
   
@@ -29,10 +30,12 @@ export function CategoryDialog({ open, onOpenChange, onSave, defaultValues, grou
     if (defaultValues) {
       setName(defaultValues.name)
       setDescription(defaultValues.description || "")
+      setSourceLink(defaultValues.sourceLink || "")
       setGroupId(defaultValues.groupId)
     } else {
       setName("")
       setDescription("")
+      setSourceLink("")
       setGroupId("")
     }
     setErrors({})
@@ -60,12 +63,14 @@ export function CategoryDialog({ open, onOpenChange, onSave, defaultValues, grou
       id: defaultValues?.id || "",
       name,
       description,
+      sourceLink,
       groupId,
     })
 
     // Reset form
     setName("")
     setDescription("")
+    setSourceLink("")
     setGroupId("")
     setErrors({})
     onOpenChange(false)
@@ -154,6 +159,20 @@ export function CategoryDialog({ open, onOpenChange, onSave, defaultValues, grou
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter category description"
                 rows={3}
+                className="border-gray-300 focus:ring-2 focus:ring-gray-800 focus:border-gray-800 shadow-sm transition-all duration-200"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="sourceLink" className="text-sm font-medium">
+                Source Link
+              </Label>
+              <Input
+                id="sourceLink"
+                type="url"
+                value={sourceLink}
+                onChange={(e) => setSourceLink(e.target.value)}
+                placeholder="https://example.com/source-material"
                 className="border-gray-300 focus:ring-2 focus:ring-gray-800 focus:border-gray-800 shadow-sm transition-all duration-200"
               />
             </div>

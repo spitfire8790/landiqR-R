@@ -21,7 +21,8 @@ import {
   Users,
   Clock,
   AlertCircle,
-  ArrowUpDown
+  ArrowUpDown,
+  ExternalLinkIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
@@ -527,13 +528,14 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
             <div className="overflow-x-auto">
               <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                 <thead>
-                  <tr>
-                    <th className="px-4 py-2 border-b text-left">Task Name</th>
-                    <th className="px-4 py-2 border-b text-left">Description</th>
-                    <th className="px-4 py-2 border-b text-left">Category</th>
-                    <th className="px-4 py-2 border-b text-left">Hours per Week</th>
-                    <th className="px-4 py-2 border-b text-left">Allocated To</th>
-                    <th className="px-4 py-2 border-b text-left">Actions</th>
+                  <tr className="border-b bg-gray-50">
+                    <th className="px-4 py-2 text-left font-medium">Name</th>
+                    <th className="px-4 py-2 text-left font-medium">Description</th>
+                    <th className="px-4 py-2 text-left font-medium">Category</th>
+                    <th className="px-4 py-2 text-left font-medium">Hours/Week</th>
+                    <th className="px-4 py-2 text-left font-medium">Source</th>
+                    <th className="px-4 py-2 text-left font-medium">Assigned To</th>
+                    <th className="px-4 py-2 text-left font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -561,6 +563,21 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin }:
                         <td className="px-4 py-2">{task.description}</td>
                         <td className="px-4 py-2">{category ? category.name : "-"}</td>
                         <td className="px-4 py-2">{task.hoursPerWeek}</td>
+                        <td className="px-4 py-2">
+                          {task.sourceLink ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(task.sourceLink, '_blank')}
+                              className="p-1 h-auto"
+                              title="View source material"
+                            >
+                              <ExternalLinkIcon className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2">
                           <div className="flex flex-wrap gap-1">
                             {allocations.length > 0 ? (

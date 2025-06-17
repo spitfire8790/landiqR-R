@@ -30,6 +30,7 @@ export async function ensureTablesExist() {
           name TEXT NOT NULL,
           description TEXT,
           group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+          source_link TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
@@ -59,6 +60,7 @@ export async function ensureTablesExist() {
           description TEXT,
           category_id UUID NOT NULL REFERENCES public.categories(id) ON DELETE CASCADE,
           hours_per_week DECIMAL(5,2) NOT NULL DEFAULT 0,
+          source_link TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
@@ -255,6 +257,7 @@ export async function fetchCategories(): Promise<Category[]> {
       name: category.name,
       description: category.description || "",
       groupId: category.group_id,
+      sourceLink: category.source_link || "",
     }))
   } catch (error) {
     console.error("Error in fetchCategories:", error)
@@ -269,6 +272,7 @@ export async function createCategory(category: Omit<Category, "id">): Promise<Ca
       name: category.name,
       description: category.description,
       group_id: category.groupId,
+      source_link: category.sourceLink,
       created_at: new Date().toISOString(),
     }
 
@@ -289,6 +293,7 @@ export async function createCategory(category: Omit<Category, "id">): Promise<Ca
       name: data.name,
       description: data.description || "",
       groupId: data.group_id,
+      sourceLink: data.source_link || "",
     }
   } catch (error) {
     console.error("Error in createCategory:", error)
@@ -304,6 +309,7 @@ export async function updateCategory(category: Category): Promise<Category | nul
         name: category.name,
         description: category.description,
         group_id: category.groupId,
+        source_link: category.sourceLink,
       })
       .eq("id", category.id)
       .select()
@@ -319,6 +325,7 @@ export async function updateCategory(category: Category): Promise<Category | nul
       name: data.name,
       description: data.description || "",
       groupId: data.group_id,
+      sourceLink: data.source_link || "",
     }
   } catch (error) {
     console.error("Error in updateCategory:", error)
@@ -549,6 +556,7 @@ export async function fetchTasks(): Promise<Task[]> {
       description: task.description || "",
       categoryId: task.category_id,
       hoursPerWeek: task.hours_per_week || 0,
+      sourceLink: task.source_link || "",
       createdAt: task.created_at,
     }))
   } catch (error) {
@@ -576,6 +584,7 @@ export async function fetchTaskById(id: string): Promise<Task | null> {
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
+      sourceLink: data.source_link || "",
       createdAt: data.created_at,
     }
   } catch (error) {
@@ -609,6 +618,7 @@ export async function fetchTasksByCategory(categoryId?: string): Promise<Task[]>
       description: task.description || "",
       categoryId: task.category_id,
       hoursPerWeek: task.hours_per_week || 0,
+      sourceLink: task.source_link || "",
       createdAt: task.created_at,
     }))
   } catch (error) {
@@ -625,6 +635,7 @@ export async function createTask(task: Omit<Task, "id" | "createdAt">): Promise<
       description: task.description,
       category_id: task.categoryId,
       hours_per_week: task.hoursPerWeek,
+      source_link: task.sourceLink,
       created_at: new Date().toISOString(),
     }
 
@@ -645,6 +656,7 @@ export async function createTask(task: Omit<Task, "id" | "createdAt">): Promise<
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
+      sourceLink: data.source_link || "",
       createdAt: data.created_at,
     }
   } catch (error) {
@@ -661,6 +673,7 @@ export async function updateTask(task: Task): Promise<Task | null> {
         name: task.name,
         description: task.description,
         hours_per_week: task.hoursPerWeek,
+        source_link: task.sourceLink,
       })
       .eq("id", task.id)
       .select()
@@ -677,6 +690,7 @@ export async function updateTask(task: Task): Promise<Task | null> {
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
+      sourceLink: data.source_link || "",
       createdAt: data.created_at,
     }
   } catch (error) {

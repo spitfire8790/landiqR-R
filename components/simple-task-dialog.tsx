@@ -51,6 +51,7 @@ export function SimpleTaskDialog({
   const [description, setDescription] = useState("")
   const [categoryId, setCategoryId] = useState("")
   const [hoursPerWeek, setHoursPerWeek] = useState<number>(0)
+  const [sourceLink, setSourceLink] = useState("")
   const [allocatedPeople, setAllocatedPeople] = useState<string[]>([])
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function SimpleTaskDialog({
       setDescription(task.description)
       setCategoryId(task.categoryId)
       setHoursPerWeek(task.hoursPerWeek || 0)
+      setSourceLink(task.sourceLink || "")
       if (existingAllocations) {
         setAllocatedPeople(existingAllocations.map(allocation => allocation.personId))
       }
@@ -67,6 +69,7 @@ export function SimpleTaskDialog({
       setDescription("")
       setCategoryId(selectedCategoryId || "")
       setHoursPerWeek(0)
+      setSourceLink("")
       setAllocatedPeople([])
     }
   }, [task, selectedCategoryId, open, existingAllocations])
@@ -78,7 +81,8 @@ export function SimpleTaskDialog({
         name: name.trim(),
         description: description.trim(),
         categoryId,
-        hoursPerWeek: Number(hoursPerWeek)
+        hoursPerWeek: Number(hoursPerWeek),
+        sourceLink
       }, allocatedPeople)
       onOpenChange(false)
     }
@@ -166,6 +170,19 @@ export function SimpleTaskDialog({
                 className="col-span-3"
                 placeholder="e.g. 5"
                 required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="sourceLink" className="text-right">
+                Source Link
+              </Label>
+              <Input
+                id="sourceLink"
+                type="url"
+                value={sourceLink}
+                onChange={(e) => setSourceLink(e.target.value)}
+                className="col-span-3"
+                placeholder="https://example.com/source-material"
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">

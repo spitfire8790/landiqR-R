@@ -31,20 +31,20 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import type { Task, WorkflowStep, TaskAllocation, Group, Category, Person } from "@/lib/types"
+import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
 import { TaskDialog } from "@/components/task-dialog"
-import { WorkflowStepDialog } from "@/components/workflow-step-dialog"
+import { ResponsibilityDialog } from "@/components/responsibility-dialog"
 import { TaskAllocationDialog } from "@/components/task-allocation-dialog"
 import {
   fetchTasksByCategory,
-  fetchWorkflowSteps,
+  fetchResponsibilities,
   fetchTaskAllocations,
   createTask,
   updateTask,
   deleteTask,
-  createWorkflowStep,
-  updateWorkflowStep,
-  deleteWorkflowStep,
+  createResponsibility,
+  updateResponsibility,
+  deleteResponsibility,
   createTaskAllocation,
   deleteTaskAllocation,
   getPeopleAllocatedToCategory,
@@ -62,7 +62,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
   const [selectedGroupId, setSelectedGroupId] = useState("")
   const [selectedCategoryId, setSelectedCategoryId] = useState("all")
   const [tasks, setTasks] = useState<Task[]>([])
-  const [workflowSteps, setWorkflowSteps] = useState<Record<string, WorkflowStep[]>>({})
+  const [responsibilities, setResponsibilities] = useState<Record<string, Responsibility[]>>({})
   const [taskAllocations, setTaskAllocations] = useState<Record<string, TaskAllocation[]>>({})
   const [availablePeople, setAvailablePeople] = useState<Person[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -70,10 +70,10 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
 
   // Dialog states
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
-  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false)
+  const [responsibilityDialogOpen, setResponsibilityDialogOpen] = useState(false)
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
-  const [editingStep, setEditingStep] = useState<WorkflowStep | undefined>(undefined)
+  const [editingResponsibility, setEditingResponsibility] = useState<Responsibility | undefined>(undefined)
   const [editingAllocation, setEditingAllocation] = useState<TaskAllocation | undefined>(undefined)
 
   const { toast } = useToast()
@@ -88,7 +88,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
       loadAvailablePeople(selectedCategoryId)
     } else {
       setTasks([])
-      setWorkflowSteps({})
+      setResponsibilities({})
       setTaskAllocations({})
       setAvailablePeople([])
     }
@@ -100,20 +100,20 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
       const tasksData = await fetchTasksByCategory(categoryId)
       setTasks(tasksData)
 
-      // Load workflow steps and allocations for each task
-      const stepsData: Record<string, WorkflowStep[]> = {}
+      // Load responsibilities and allocations for each task
+      const responsibilitiesData: Record<string, Responsibility[]> = {}
       const allocationsData: Record<string, TaskAllocation[]> = {}
 
       for (const task of tasksData) {
-        const [steps, allocations] = await Promise.all([
-          fetchWorkflowSteps(task.id),
+        const [taskResponsibilities, allocations] = await Promise.all([
+          fetchResponsibilities(task.id),
           fetchTaskAllocations(task.id),
         ])
-        stepsData[task.id] = steps
+        responsibilitiesData[task.id] = taskResponsibilities
         allocationsData[task.id] = allocations
       }
 
-      setWorkflowSteps(stepsData)
+      setResponsibilities(responsibilitiesData)
       setTaskAllocations(allocationsData)
     } catch (error) {
       console.error("Error loading tasks:", error)
@@ -129,8 +129,8 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
 
   const loadAvailablePeople = async (categoryId: string) => {
     try {
-      const peopleData = await getPeopleAllocatedToCategory(categoryId)
-      setAvailablePeople(peopleData)
+      const people = await getPeopleAllocatedToCategory(categoryId)
+      setAvailablePeople(people)
     } catch (error) {
       console.error("Error loading available people:", error)
     }
@@ -141,15 +141,14 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     try {
       const newTask = await createTask(taskData)
       if (newTask) {
-        setTasks(prev => [...prev, newTask])
-        setWorkflowSteps(prev => ({ ...prev, [newTask.id]: [] }))
-        setTaskAllocations(prev => ({ ...prev, [newTask.id]: [] }))
+        await loadTasksForCategory(selectedCategoryId)
         toast({
           title: "Success",
           description: "Task created successfully.",
         })
       }
     } catch (error) {
+      console.error("Error creating task:", error)
       toast({
         title: "Error",
         description: "Failed to create task. Please try again.",
@@ -159,24 +158,28 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
   }
 
   const handleTaskSave = async (taskData: Omit<Task, "id" | "createdAt">) => {
-    if (editingTask) {
-      // Update existing task
-      const fullTask: Task = {
-        ...taskData,
-        id: editingTask.id,
-        createdAt: editingTask.createdAt
+    try {
+      if (editingTask) {
+        const updatedTask = await updateTask({ ...editingTask, ...taskData })
+        if (updatedTask) {
+          await loadTasksForCategory(selectedCategoryId)
+          toast({
+            title: "Success",
+            description: "Task updated successfully.",
+          })
+        }
+      } else {
+        await handleCreateTask(taskData)
       }
-      const updatedTask = await updateTask(fullTask)
-      if (updatedTask) {
-        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
-        toast({
-          title: "Success",
-          description: "Task updated successfully.",
-        })
-      }
-    } else {
-      // Create new task
-      await handleCreateTask(taskData)
+      setTaskDialogOpen(false)
+      setEditingTask(undefined)
+    } catch (error) {
+      console.error("Error saving task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save task. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -184,23 +187,14 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     try {
       const success = await deleteTask(taskId)
       if (success) {
-        setTasks(prev => prev.filter(t => t.id !== taskId))
-        setWorkflowSteps(prev => {
-          const newSteps = { ...prev }
-          delete newSteps[taskId]
-          return newSteps
-        })
-        setTaskAllocations(prev => {
-          const newAllocations = { ...prev }
-          delete newAllocations[taskId]
-          return newAllocations
-        })
+        await loadTasksForCategory(selectedCategoryId)
         toast({
           title: "Success",
           description: "Task deleted successfully.",
         })
       }
     } catch (error) {
+      console.error("Error deleting task:", error)
       toast({
         title: "Error",
         description: "Failed to delete task. Please try again.",
@@ -209,73 +203,80 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     }
   }
 
-  // Workflow step operations
-  const handleCreateWorkflowStep = async (stepData: Omit<WorkflowStep, "id" | "createdAt">) => {
+  // Responsibility operations
+  const handleCreateResponsibility = async (responsibilityData: Omit<Responsibility, "id" | "createdAt">) => {
     try {
-      const newStep = await createWorkflowStep(stepData)
-      if (newStep) {
-        setWorkflowSteps(prev => ({
+      const newResponsibility = await createResponsibility(responsibilityData)
+      if (newResponsibility && selectedTask) {
+        const taskResponsibilities = await fetchResponsibilities(selectedTask.id)
+        setResponsibilities(prev => ({
           ...prev,
-          [stepData.taskId]: [...(prev[stepData.taskId] || []), newStep].sort((a, b) => a.order - b.order)
+          [selectedTask.id]: taskResponsibilities
         }))
         toast({
           title: "Success",
-          description: "Workflow step created successfully.",
+          description: "Responsibility created successfully.",
         })
       }
     } catch (error) {
+      console.error("Error creating responsibility:", error)
       toast({
         title: "Error",
-        description: "Failed to create workflow step. Please try again.",
+        description: "Failed to create responsibility. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  const handleStepSave = async (stepData: Omit<WorkflowStep, "id" | "createdAt">) => {
-    if (editingStep) {
-      // Update existing step
-      const fullStep: WorkflowStep = {
-        ...stepData,
-        id: editingStep.id,
-        createdAt: editingStep.createdAt
+  const handleResponsibilitySave = async (responsibilityData: Omit<Responsibility, "id" | "createdAt">) => {
+    try {
+      if (editingResponsibility) {
+        const updatedResponsibility = await updateResponsibility({ ...editingResponsibility, ...responsibilityData })
+        if (updatedResponsibility && selectedTask) {
+          const taskResponsibilities = await fetchResponsibilities(selectedTask.id)
+          setResponsibilities(prev => ({
+            ...prev,
+            [selectedTask.id]: taskResponsibilities
+          }))
+          toast({
+            title: "Success",
+            description: "Responsibility updated successfully.",
+          })
+        }
+      } else {
+        await handleCreateResponsibility(responsibilityData)
       }
-      const updatedStep = await updateWorkflowStep(fullStep)
-      if (updatedStep) {
-        setWorkflowSteps(prev => ({
-          ...prev,
-          [stepData.taskId]: (prev[stepData.taskId] || [])
-            .map(s => s.id === updatedStep.id ? updatedStep : s)
-            .sort((a, b) => a.order - b.order)
-        }))
-        toast({
-          title: "Success",
-          description: "Workflow step updated successfully.",
-        })
-      }
-    } else {
-      // Create new step
-      await handleCreateWorkflowStep(stepData)
+      setResponsibilityDialogOpen(false)
+      setEditingResponsibility(undefined)
+    } catch (error) {
+      console.error("Error saving responsibility:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save responsibility. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeleteWorkflowStep = async (stepId: string, taskId: string) => {
+  const handleDeleteResponsibility = async (responsibilityId: string, taskId: string) => {
     try {
-      const success = await deleteWorkflowStep(stepId)
+      const success = await deleteResponsibility(responsibilityId)
       if (success) {
-        setWorkflowSteps(prev => ({
+        const taskResponsibilities = await fetchResponsibilities(taskId)
+        setResponsibilities(prev => ({
           ...prev,
-          [taskId]: (prev[taskId] || []).filter(s => s.id !== stepId)
+          [taskId]: taskResponsibilities
         }))
         toast({
           title: "Success",
-          description: "Workflow step deleted successfully.",
+          description: "Responsibility deleted successfully.",
         })
       }
     } catch (error) {
+      console.error("Error deleting responsibility:", error)
       toast({
         title: "Error",
-        description: "Failed to delete workflow step. Please try again.",
+        description: "Failed to delete responsibility. Please try again.",
         variant: "destructive",
       })
     }
@@ -285,17 +286,21 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
   const handleCreateTaskAllocation = async (allocationData: Omit<TaskAllocation, "id" | "createdAt">) => {
     try {
       const newAllocation = await createTaskAllocation(allocationData)
-      if (newAllocation) {
+      if (newAllocation && selectedTask) {
+        const allocations = await fetchTaskAllocations(selectedTask.id)
         setTaskAllocations(prev => ({
           ...prev,
-          [allocationData.taskId]: [...(prev[allocationData.taskId] || []), newAllocation]
+          [selectedTask.id]: allocations
         }))
         toast({
           title: "Success",
           description: "Task allocation created successfully.",
         })
       }
+      setAllocationDialogOpen(false)
+      setEditingAllocation(undefined)
     } catch (error) {
+      console.error("Error creating task allocation:", error)
       toast({
         title: "Error",
         description: "Failed to create task allocation. Please try again.",
@@ -308,9 +313,10 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     try {
       const success = await deleteTaskAllocation(allocationId)
       if (success) {
+        const allocations = await fetchTaskAllocations(taskId)
         setTaskAllocations(prev => ({
           ...prev,
-          [taskId]: (prev[taskId] || []).filter(a => a.id !== allocationId)
+          [taskId]: allocations
         }))
         toast({
           title: "Success",
@@ -318,6 +324,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
         })
       }
     } catch (error) {
+      console.error("Error deleting task allocation:", error)
       toast({
         title: "Error",
         description: "Failed to delete task allocation. Please try again.",
@@ -327,69 +334,28 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
   }
 
   // Helper functions
-  const getPriorityColor = (priority: Task["priority"]) => {
-    switch (priority) {
-      case "critical": return "bg-red-100 text-red-800 border-red-200"
-      case "high": return "bg-orange-100 text-orange-800 border-orange-200"
-      case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "low": return "bg-green-100 text-green-800 border-green-200"
-      default: return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getStatusColor = (status: Task["status"]) => {
-    switch (status) {
-      case "completed": return "bg-green-100 text-green-800 border-green-200"
-      case "in_progress": return "bg-blue-100 text-blue-800 border-blue-200"
-      case "on_hold": return "bg-orange-100 text-orange-800 border-orange-200"
-      case "not_started": return "bg-gray-100 text-gray-800 border-gray-200"
-      default: return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getStatusIcon = (status: Task["status"]) => {
-    switch (status) {
-      case "completed": return <CheckCircle2 className="h-4 w-4" />
-      case "in_progress": return <Play className="h-4 w-4" />
-      case "on_hold": return <Pause className="h-4 w-4" />
-      case "not_started": return <Circle className="h-4 w-4" />
-      default: return <Circle className="h-4 w-4" />
-    }
-  }
-
-  const getWorkflowProgress = (steps: WorkflowStep[]) => {
-    if (steps.length === 0) return 0
-    const completedSteps = steps.filter(s => s.status === "completed").length
-    return (completedSteps / steps.length) * 100
-  }
-
   const getPersonName = (personId: string) => {
-    const person = people.find(p => p.id === personId) || availablePeople.find(p => p.id === personId)
-    return person?.name || "Unknown"
-  }
-
-  const getNextStepOrder = (taskId: string) => {
-    const steps = workflowSteps[taskId] || []
-    return steps.length > 0 ? Math.max(...steps.map(s => s.order)) + 1 : 1
+    const person = people.find(p => p.id === personId)
+    return person ? person.name : "Unknown"
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Tasks</h1>
-          <p className="text-gray-600">Manage tasks and workflows for your categories</p>
+          <h2 className="text-3xl font-bold tracking-tight">Tasks</h2>
+          <p className="text-muted-foreground">
+            Manage tasks and responsibilities for your categories
+          </p>
         </div>
       </div>
 
-      {/* Selection Controls */}
-      <div className="flex gap-4 p-6 border-b bg-gray-50">
+      {/* Group and Category Selection */}
+      <div className="flex gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium mb-2">Select Group</label>
           <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose a group" />
+              <SelectValue placeholder="Select a group" />
             </SelectTrigger>
             <SelectContent>
               {groups.map((group) => (
@@ -402,16 +368,16 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
         </div>
 
         <div className="flex-1">
-          <label className="block text-sm font-medium mb-2">Select Category</label>
           <Select 
             value={selectedCategoryId} 
             onValueChange={setSelectedCategoryId}
             disabled={!selectedGroupId}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Choose a category" />
+              <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
               {filteredCategories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
@@ -421,85 +387,69 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
           </Select>
         </div>
 
-        {isAdmin && selectedCategoryId && (
-          <div className="flex items-end">
-            <Button 
-              onClick={() => {
-                setEditingTask(undefined)
-                setTaskDialogOpen(true)
-              }}
-              className="bg-black hover:bg-gray-800 text-white"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Task
-            </Button>
-          </div>
+        {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
+          <Button onClick={() => setTaskDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Task
+          </Button>
         )}
       </div>
 
-      {/* Tasks Content */}
-      <div className="flex-1 overflow-hidden">
-        {!selectedCategoryId ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Category Selected</h3>
-              <p className="text-gray-600">Please select a group and category to view tasks.</p>
-            </div>
-          </div>
-        ) : loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading tasks...</p>
-            </div>
+      {/* Tasks List */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Loading tasks...</p>
           </div>
         ) : tasks.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <CheckCircle2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Tasks Yet</h3>
-              <p className="text-gray-600 mb-4">
-                Create your first task for this category to get started.
-              </p>
-              {isAdmin && (
-                <Button 
-                  onClick={() => {
-                    setEditingTask(undefined)
-                    setTaskDialogOpen(true)
-                  }}
-                  className="bg-black hover:bg-gray-800 text-white"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Create First Task
-                </Button>
-              )}
-            </div>
+          <div className="text-center py-8">
+            <p className="text-gray-500">No tasks found for the selected category.</p>
+            {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
+              <Button 
+                className="mt-4" 
+                onClick={() => setTaskDialogOpen(true)}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create First Task
+              </Button>
+            )}
           </div>
         ) : (
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
+          <ScrollArea className="h-[600px]">
+            <div className="space-y-4">
               {tasks.map((task) => {
-                const steps = workflowSteps[task.id] || []
+                const taskResponsibilities = responsibilities[task.id] || []
                 const allocations = taskAllocations[task.id] || []
-                const progress = getWorkflowProgress(steps)
-                
+                const totalWeeklyHours = taskResponsibilities.reduce((sum, resp) => sum + resp.estimatedWeeklyHours, 0)
+
                 return (
                   <Card key={task.id} className="w-full">
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-lg">{task.name}</CardTitle>
-                            <Badge className={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            <Badge className={getStatusColor(task.status)}>
-                              {getStatusIcon(task.status)}
-                              <span className="ml-1 capitalize">{task.status.replace('_', ' ')}</span>
-                            </Badge>
-                          </div>
+                        <div className="space-y-1 flex-1">
+                          <CardTitle className="text-xl">{task.name}</CardTitle>
                           <CardDescription>{task.description}</CardDescription>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{task.hoursPerWeek}h/week</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Workflow className="h-4 w-4" />
+                              <span>{taskResponsibilities.length} responsibilities</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              <span>{allocations.length} allocated</span>
+                            </div>
+                            {totalWeeklyHours > 0 && (
+                              <div className="flex items-center gap-1">
+                                <AlertCircle className="h-4 w-4" />
+                                <span>{totalWeeklyHours}h total estimated</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         {isAdmin && (
@@ -508,6 +458,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                               variant="outline"
                               size="sm"
                               onClick={() => {
+                                setSelectedTask(task)
                                 setEditingTask(task)
                                 setTaskDialogOpen(true)
                               }}
@@ -524,134 +475,103 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                           </div>
                         )}
                       </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        {task.dueDate && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>Due: {format(new Date(task.dueDate), "MMM d, yyyy")}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          <span>{allocations.length} people assigned</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Workflow className="h-4 w-4" />
-                          <span>{steps.length} workflow steps</span>
-                        </div>
-                      </div>
                     </CardHeader>
-                    
-                    <CardContent className="space-y-4">
+
+                    <CardContent className="space-y-6">
                       {/* Task Allocations */}
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">Assigned People</h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Task Allocations
+                          </h4>
                           {isAdmin && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
                                 setSelectedTask(task)
-                                setEditingAllocation(undefined)
                                 setAllocationDialogOpen(true)
                               }}
                             >
                               <PlusCircle className="h-4 w-4 mr-1" />
-                              Assign
+                              Add Person
                             </Button>
                           )}
                         </div>
                         
                         {allocations.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
+                          <div className="space-y-2">
                             {allocations.map((allocation) => (
-                              <Badge key={allocation.id} variant="secondary" className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {getPersonName(allocation.personId)}
-                                {allocation.isLead && <span className="text-xs">(Lead)</span>}
-                                {allocation.hoursAllocated && (
-                                  <span className="text-xs">({allocation.hoursAllocated}h)</span>
-                                )}
+                              <div key={allocation.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4" />
+                                  <span>{getPersonName(allocation.personId)}</span>
+                                  {allocation.isLead && (
+                                    <Badge variant="secondary" className="text-xs">Lead</Badge>
+                                  )}
+                                  <span className="text-sm text-gray-600">
+                                    {allocation.estimatedWeeklyHours}h/week
+                                  </span>
+                                </div>
                                 {isAdmin && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-4 w-4 p-0 ml-1"
                                     onClick={() => handleDeleteTaskAllocation(allocation.id, task.id)}
                                   >
-                                    ×
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
-                              </Badge>
+                              </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-500">No one assigned yet</p>
+                          <p className="text-sm text-gray-500">No people allocated to this task yet</p>
                         )}
                       </div>
 
-                      {/* Workflow Progress */}
-                      {steps.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">Workflow Progress</h4>
-                            <span className="text-sm text-gray-600">{Math.round(progress)}% complete</span>
-                          </div>
-                          <Progress value={progress} className="mb-3" />
-                        </div>
-                      )}
+                      <Separator />
 
-                      {/* Workflow Steps */}
+                      {/* Responsibilities */}
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">Workflow Steps</h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Workflow className="h-4 w-4" />
+                            Responsibilities
+                          </h4>
                           {isAdmin && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
                                 setSelectedTask(task)
-                                setEditingStep(undefined)
-                                setWorkflowDialogOpen(true)
+                                setResponsibilityDialogOpen(true)
                               }}
                             >
                               <PlusCircle className="h-4 w-4 mr-1" />
-                              Add Step
+                              Add Responsibility
                             </Button>
                           )}
                         </div>
                         
-                        {steps.length > 0 ? (
-                          <div className="space-y-2">
-                            {steps.map((step, index) => (
-                              <div key={step.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm font-medium text-gray-500">#{step.order}</span>
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">{step.name}</span>
-                                      <Badge 
-                                        variant={step.status === "completed" ? "default" : "secondary"}
-                                        className="text-xs"
-                                      >
-                                        {step.status.replace('_', ' ')}
-                                      </Badge>
-                                    </div>
-                                    {step.description && (
-                                      <p className="text-sm text-gray-600 mt-1">{step.description}</p>
-                                    )}
-                                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                                      {step.responsiblePersonId && (
-                                        <span>Assigned: {getPersonName(step.responsiblePersonId)}</span>
-                                      )}
-                                      {step.estimatedHours && (
-                                        <span>Est: {step.estimatedHours}h</span>
-                                      )}
-                                      {step.actualHours && (
-                                        <span>Actual: {step.actualHours}h</span>
-                                      )}
+                        {taskResponsibilities.length > 0 ? (
+                          <div className="space-y-3">
+                            {taskResponsibilities.map((responsibility) => (
+                              <div key={responsibility.id} className="flex items-start justify-between p-3 border rounded-lg">
+                                <div className="flex-1">
+                                  <div className="flex items-start gap-2">
+                                    <Circle className="h-4 w-4 mt-0.5 text-gray-400" />
+                                    <div className="flex-1">
+                                      <p className="font-medium">{responsibility.description}</p>
+                                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                                        {responsibility.assignedPersonId && (
+                                          <span>Assigned: {getPersonName(responsibility.assignedPersonId)}</span>
+                                        )}
+                                        {responsibility.estimatedWeeklyHours > 0 && (
+                                          <span>Est: {responsibility.estimatedWeeklyHours}h/week</span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -663,8 +583,8 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                                       size="sm"
                                       onClick={() => {
                                         setSelectedTask(task)
-                                        setEditingStep(step)
-                                        setWorkflowDialogOpen(true)
+                                        setEditingResponsibility(responsibility)
+                                        setResponsibilityDialogOpen(true)
                                       }}
                                     >
                                       <Edit className="h-4 w-4" />
@@ -672,7 +592,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleDeleteWorkflowStep(step.id, task.id)}
+                                      onClick={() => handleDeleteResponsibility(responsibility.id, task.id)}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -682,7 +602,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-500">No workflow steps defined yet</p>
+                          <p className="text-sm text-gray-500">No responsibilities defined yet</p>
                         )}
                       </div>
                     </CardContent>
@@ -708,14 +628,13 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
 
           {selectedTask && (
             <>
-              <WorkflowStepDialog
-                open={workflowDialogOpen}
-                onOpenChange={setWorkflowDialogOpen}
-                onSave={handleStepSave}
+              <ResponsibilityDialog
+                open={responsibilityDialogOpen}
+                onOpenChange={setResponsibilityDialogOpen}
+                onSave={handleResponsibilitySave}
                 availablePeople={availablePeople}
                 taskId={selectedTask.id}
-                step={editingStep}
-                nextOrder={getNextStepOrder(selectedTask.id)}
+                responsibility={editingResponsibility}
               />
 
               <TaskAllocationDialog

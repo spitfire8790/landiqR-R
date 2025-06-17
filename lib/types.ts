@@ -9,6 +9,7 @@ export interface Category {
   name: string
   description: string
   groupId: string // Required field to link to a group
+  sourceLink?: string // Optional link to source material
 }
 
 export interface Person {
@@ -33,6 +34,7 @@ export interface Task {
   categoryId: string
   hoursPerWeek: number
   createdAt: string
+  sourceLink?: string // Optional link to source material
 }
 
 export interface Responsibility {

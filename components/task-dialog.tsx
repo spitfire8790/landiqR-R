@@ -47,25 +47,22 @@ export function TaskDialog({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [categoryId, setCategoryId] = useState("")
-  const [status, setStatus] = useState<Task["status"]>("not_started")
-  const [priority, setPriority] = useState<Task["priority"]>("medium")
-  const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
+  const [hoursPerWeek, setHoursPerWeek] = useState(0)
+  const [sourceLink, setSourceLink] = useState("")
 
   useEffect(() => {
     if (task) {
       setName(task.name)
       setDescription(task.description)
       setCategoryId(task.categoryId)
-      setStatus(task.status)
-      setPriority(task.priority)
-      setDueDate(task.dueDate ? new Date(task.dueDate) : undefined)
+      setHoursPerWeek(task.hoursPerWeek)
+      setSourceLink(task.sourceLink || "")
     } else {
       setName("")
       setDescription("")
       setCategoryId(selectedCategoryId || "")
-      setStatus("not_started")
-      setPriority("medium")
-      setDueDate(undefined)
+      setHoursPerWeek(0)
+      setSourceLink("")
     }
   }, [task, selectedCategoryId, open])
 
@@ -76,9 +73,8 @@ export function TaskDialog({
         name: name.trim(),
         description: description.trim(),
         categoryId,
-        status,
-        priority,
-        dueDate: dueDate?.toISOString(),
+        hoursPerWeek,
+        sourceLink,
       })
       onOpenChange(false)
     }
@@ -86,40 +82,6 @@ export function TaskDialog({
 
   const handleCancel = () => {
     onOpenChange(false)
-  }
-
-  const statusOptions = [
-    { value: "not_started", label: "Not Started" },
-    { value: "in_progress", label: "In Progress" },
-    { value: "completed", label: "Completed" },
-    { value: "on_hold", label: "On Hold" },
-  ]
-
-  const priorityOptions = [
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
-    { value: "critical", label: "Critical" },
-  ]
-
-  const getPriorityColor = (priority: Task["priority"]) => {
-    switch (priority) {
-      case "critical": return "text-red-600"
-      case "high": return "text-orange-600"
-      case "medium": return "text-yellow-600"
-      case "low": return "text-green-600"
-      default: return "text-gray-600"
-    }
-  }
-
-  const getStatusColor = (status: Task["status"]) => {
-    switch (status) {
-      case "completed": return "text-green-600"
-      case "in_progress": return "text-blue-600"
-      case "on_hold": return "text-orange-600"
-      case "not_started": return "text-gray-600"
-      default: return "text-gray-600"
-    }
   }
 
   return (
@@ -146,9 +108,9 @@ export function TaskDialog({
                 required
               />
             </div>
-            
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right pt-2">
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
                 Description
               </Label>
               <Textarea
@@ -180,71 +142,33 @@ export function TaskDialog({
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Status
+              <Label htmlFor="hoursPerWeek" className="text-right">
+                Hours/Week
               </Label>
-              <Select value={status} onValueChange={(value: Task["status"]) => setStatus(value)}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <span className={getStatusColor(option.value as Task["status"])}>
-                        {option.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="hoursPerWeek"
+                type="number"
+                min="0"
+                step="0.5"
+                value={hoursPerWeek}
+                onChange={(e) => setHoursPerWeek(parseFloat(e.target.value) || 0)}
+                className="col-span-3"
+                placeholder="0"
+              />
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="priority" className="text-right">
-                Priority
+              <Label htmlFor="sourceLink" className="text-right">
+                Source Link
               </Label>
-              <Select value={priority} onValueChange={(value: Task["priority"]) => setPriority(value)}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorityOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <span className={getPriorityColor(option.value as Task["priority"])}>
-                        {option.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="dueDate" className="text-right">
-                Due Date
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Input
+                id="sourceLink"
+                type="url"
+                value={sourceLink}
+                onChange={(e) => setSourceLink(e.target.value)}
+                className="col-span-3"
+                placeholder="https://example.com/source-material"
+              />
             </div>
           </div>
           <DialogFooter>
