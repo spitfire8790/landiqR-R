@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { Plus, Edit, Trash2, Users, Clock, ExternalLink, RefreshCw } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -10,16 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
   PlusCircle, 
   User, 
-  Edit,
-  Trash2,
-  Users,
-  Clock,
+  Edit as EditIcon,
+  Trash2 as TrashIcon,
+  Users as UsersIcon,
+  Clock as ClockIcon,
   AlertCircle,
   ArrowUpDown,
   ExternalLinkIcon,
@@ -566,18 +567,26 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin, o
         </div>
 
         {/* Add Task Button */}
-        {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
+        <div className="flex gap-2 mb-2">
+          {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
+            <Button 
+              onClick={() => {
+                setEditingTask(undefined)
+                setTaskDialogOpen(true)
+              }}
+              className="mb-2"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
+          )}
           <Button 
-            onClick={() => {
-              setEditingTask(undefined)
-              setTaskDialogOpen(true)
-            }}
-            className="mb-2"
+            onClick={() => loadTasksForCategory(selectedCategoryId === "all" ? undefined : selectedCategoryId)}
           >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Task
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Content */}
@@ -684,14 +693,14 @@ export default function SimpleTasksView({ groups, categories, people, isAdmin, o
         setTaskDialogOpen(true)
       }}
     >
-      <Edit className="h-4 w-4" />
+      <EditIcon className="h-4 w-4" />
     </Button>
     <Button
       variant="outline"
       size="sm"
       onClick={() => handleDeleteTask(task.id)}
     >
-      <Trash2 className="h-4 w-4" />
+      <TrashIcon className="h-4 w-4" />
     </Button>
   </div>
 </td>

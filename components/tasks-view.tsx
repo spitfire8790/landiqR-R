@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { Plus, Edit, Trash2, Users, Clock, RefreshCw } from "lucide-react"
+import { motion } from "framer-motion"
 import {
   Select,
   SelectContent,
@@ -10,31 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  PlusCircle, 
-  Calendar, 
-  Clock, 
-  User, 
-  CheckCircle2, 
-  Circle, 
-  AlertCircle,
-  Play,
-  Pause,
-  Edit,
-  Trash2,
-  Users,
-  Workflow
-} from "lucide-react"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
-import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
+import { useToast } from "@/hooks/use-toast" // Fix useToast import
 import { TaskDialog } from "@/components/task-dialog"
 import { ResponsibilityDialog } from "@/components/responsibility-dialog"
-import { TaskAllocationDialog } from "@/components/task-allocation-dialog"
+import TaskAllocationDialog from "@/components/task-allocation-dialog"
+import type { Task, Responsibility, TaskAllocation, Group, Category, Person } from "@/lib/types"
 import {
   fetchTasksByCategory,
   fetchResponsibilities,
@@ -47,9 +32,25 @@ import {
   deleteResponsibility,
   createTaskAllocation,
   deleteTaskAllocation,
-  getPeopleAllocatedToCategory,
 } from "@/lib/data-service"
-import { useToast } from "@/hooks/use-toast"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { 
+  PlusCircle, 
+  Calendar, 
+  Clock as ClockIcon, 
+  User, 
+  CheckCircle2, 
+  Circle, 
+  AlertCircle,
+  Play,
+  Pause,
+  Edit as EditIcon,
+  Trash2 as Trash2Icon,
+  Users as UsersIcon,
+  Workflow
+} from "lucide-react"
+import { getPeopleAllocatedToCategory } from "@/lib/data-service"
 
 interface TasksViewProps {
   groups: Group[]
@@ -64,19 +65,18 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
   const [tasks, setTasks] = useState<Task[]>([])
   const [responsibilities, setResponsibilities] = useState<Record<string, Responsibility[]>>({})
   const [taskAllocations, setTaskAllocations] = useState<Record<string, TaskAllocation[]>>({})
-  const [availablePeople, setAvailablePeople] = useState<Person[]>([])
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  // Dialog states
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [responsibilityDialogOpen, setResponsibilityDialogOpen] = useState(false)
-  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
-  const [editingResponsibility, setEditingResponsibility] = useState<Responsibility | undefined>(undefined)
-  const [editingAllocation, setEditingAllocation] = useState<TaskAllocation | undefined>(undefined)
-
+  const [taskAllocationDialogOpen, setTaskAllocationDialogOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | undefined>()
+  const [editingResponsibility, setEditingResponsibility] = useState<Responsibility | undefined>()
+  const [currentTaskId, setCurrentTaskId] = useState<string>("")
+  const [availablePeople, setAvailablePeople] = useState<Person[]>([])
+  const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+
+  // Dialog states
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   // Get categories for selected group (sorted alphabetically)
   const filteredCategories = categories
@@ -143,6 +143,10 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
     } catch (error) {
       console.error("Error loading available people:", error)
     }
+  }
+
+  const handleRefreshTasks = async () => {
+    await loadTasksForCategory(selectedCategoryId)
   }
 
   // Task CRUD operations
@@ -306,8 +310,8 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
           description: "Task allocation created successfully.",
         })
       }
-      setAllocationDialogOpen(false)
-      setEditingAllocation(undefined)
+      setTaskAllocationDialogOpen(false)
+      setEditingResponsibility(undefined)
     } catch (error) {
       console.error("Error creating task allocation:", error)
       toast({
@@ -405,12 +409,18 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
           </Select>
         </div>
 
-        {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
-          <Button onClick={() => setTaskDialogOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Task
+        <div className="flex gap-2">
+          {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
+            <Button onClick={() => setTaskDialogOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Task
+            </Button>
+          )}
+          <Button onClick={handleRefreshTasks}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Tasks List */}
@@ -450,7 +460,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                           <CardDescription>{task.description}</CardDescription>
                           <div className="flex items-center gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
+                              <ClockIcon className="h-4 w-4" />
                               <span>{task.hoursPerWeek}h/week</span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -458,7 +468,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                               <span>{taskResponsibilities.length} responsibilities</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
+                              <UsersIcon className="h-4 w-4" />
                               <span>{allocations.length} allocated</span>
                             </div>
                             {totalWeeklyHours > 0 && (
@@ -481,14 +491,14 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                                 setTaskDialogOpen(true)
                               }}
                             >
-                              <Edit className="h-4 w-4" />
+                              <EditIcon className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteTask(task.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2Icon className="h-4 w-4" />
                             </Button>
                           </div>
                         )}
@@ -500,7 +510,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="font-medium flex items-center gap-2">
-                            <Users className="h-4 w-4" />
+                            <UsersIcon className="h-4 w-4" />
                             Task Allocations
                           </h4>
                           {isAdmin && (
@@ -509,7 +519,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                               size="sm"
                               onClick={() => {
                                 setSelectedTask(task)
-                                setAllocationDialogOpen(true)
+                                setTaskAllocationDialogOpen(true)
                               }}
                             >
                               <PlusCircle className="h-4 w-4 mr-1" />
@@ -538,7 +548,7 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                                     size="sm"
                                     onClick={() => handleDeleteTaskAllocation(allocation.id, task.id)}
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2Icon className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
@@ -605,14 +615,14 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
                                         setResponsibilityDialogOpen(true)
                                       }}
                                     >
-                                      <Edit className="h-4 w-4" />
+                                      <EditIcon className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleDeleteResponsibility(responsibility.id, task.id)}
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2Icon className="h-4 w-4" />
                                     </Button>
                                   </div>
                                 )}
@@ -656,12 +666,12 @@ export default function TasksView({ groups, categories, people, isAdmin }: Tasks
               />
 
               <TaskAllocationDialog
-                open={allocationDialogOpen}
-                onOpenChange={setAllocationDialogOpen}
+                open={taskAllocationDialogOpen}
+                onOpenChange={setTaskAllocationDialogOpen}
                 onSave={handleCreateTaskAllocation}
                 availablePeople={availablePeople}
                 taskId={selectedTask.id}
-                allocation={editingAllocation}
+                allocation={undefined}
               />
             </>
           )}
