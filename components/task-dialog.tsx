@@ -22,15 +22,20 @@ import {
 } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Plus, Trash2, ExternalLink } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import type { Task, Category } from "@/lib/types"
+import type { Task, Category, TaskSourceLink } from "@/lib/types"
+import { 
+  createTaskSourceLink, 
+  updateTaskSourceLink, 
+  deleteTaskSourceLink 
+} from "@/lib/data-service"
 
 interface TaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (task: Omit<Task, "id" | "createdAt">) => void
+  onSave: (task: Omit<Task, "id" | "createdAt">, sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]) => void
   categories: Category[]
   selectedCategoryId?: string
   task?: Task
@@ -48,7 +53,9 @@ export function TaskDialog({
   const [description, setDescription] = useState("")
   const [categoryId, setCategoryId] = useState("")
   const [hoursPerWeek, setHoursPerWeek] = useState(0)
-  const [sourceLink, setSourceLink] = useState("")
+  const [sourceLinks, setSourceLinks] = useState<TaskSourceLink[]>([])
+  const [newLinkUrl, setNewLinkUrl] = useState("")
+  const [newLinkDescription, setNewLinkDescription] = useState("")
 
   useEffect(() => {
     if (task) {
@@ -56,26 +63,102 @@ export function TaskDialog({
       setDescription(task.description)
       setCategoryId(task.categoryId)
       setHoursPerWeek(task.hoursPerWeek)
-      setSourceLink(task.sourceLink || "")
+      setSourceLinks(task.sourceLinks || [])
     } else {
       setName("")
       setDescription("")
       setCategoryId(selectedCategoryId || "")
       setHoursPerWeek(0)
-      setSourceLink("")
+      setSourceLinks([])
     }
+    setNewLinkUrl("")
+    setNewLinkDescription("")
   }, [task, selectedCategoryId, open])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAddSourceLink = () => {
+    if (newLinkUrl.trim()) {
+      const newLink: TaskSourceLink = {
+        id: `temp-${Date.now()}`, // Temporary ID for new links
+        taskId: task?.id || "",
+        url: newLinkUrl.trim(),
+        description: newLinkDescription.trim(),
+        createdAt: new Date().toISOString(),
+      }
+      setSourceLinks([...sourceLinks, newLink])
+      setNewLinkUrl("")
+      setNewLinkDescription("")
+    }
+  }
+
+  const handleUpdateSourceLink = (index: number, field: 'url' | 'description', value: string) => {
+    const updatedLinks = [...sourceLinks]
+    updatedLinks[index] = { ...updatedLinks[index], [field]: value }
+    setSourceLinks(updatedLinks)
+  }
+
+  const handleDeleteSourceLink = (index: number) => {
+    const updatedLinks = sourceLinks.filter((_, i) => i !== index)
+    setSourceLinks(updatedLinks)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim() && categoryId) {
-      onSave({
+      // Prepare task data
+      const taskData = {
         name: name.trim(),
         description: description.trim(),
         categoryId,
         hoursPerWeek,
-        sourceLink,
-      })
+        sourceLinks: [], // Will be handled separately
+      }
+      
+      if (task?.id) {
+        // Editing existing task - handle source links here
+        // Handle source links for existing task
+        const existingLinks = task.sourceLinks || []
+        const currentLinks = sourceLinks
+
+        // Delete removed links
+        for (const existingLink of existingLinks) {
+          const stillExists = currentLinks.find(link => link.id === existingLink.id)
+          if (!stillExists) {
+            await deleteTaskSourceLink(existingLink.id)
+          }
+        }
+
+        // Update or create links
+        for (const link of currentLinks) {
+          if (link.id.startsWith('temp-')) {
+            // Create new link
+            await createTaskSourceLink({
+              taskId: task.id,
+              url: link.url,
+              description: link.description,
+            })
+          } else {
+            // Update existing link
+            const existingLink = existingLinks.find(l => l.id === link.id)
+            if (existingLink && (existingLink.url !== link.url || existingLink.description !== link.description)) {
+              await updateTaskSourceLink(link)
+            }
+          }
+        }
+        
+        // Save task without source links data
+        onSave(taskData)
+      } else {
+        // Creating new task - pass source links to parent
+        const newSourceLinks = sourceLinks
+          .filter(link => link.id.startsWith('temp-'))
+          .map(link => ({
+            url: link.url,
+            description: link.description,
+          }))
+        
+        onSave(taskData, newSourceLinks)
+      }
+      
       onOpenChange(false)
     }
   }
@@ -86,7 +169,7 @@ export function TaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Add New Task"}</DialogTitle>
           <DialogDescription>
@@ -157,18 +240,76 @@ export function TaskDialog({
               />
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sourceLink" className="text-right">
-                Source Link
+            {/* Source Links Section */}
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">
+                Source Links
               </Label>
-              <Input
-                id="sourceLink"
-                type="url"
-                value={sourceLink}
-                onChange={(e) => setSourceLink(e.target.value)}
-                className="col-span-3"
-                placeholder="https://example.com/source-material"
-              />
+              <div className="col-span-3 space-y-3">
+                {/* Existing source links */}
+                {sourceLinks.map((link, index) => (
+                  <div key={link.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="url"
+                        value={link.url}
+                        onChange={(e) => handleUpdateSourceLink(index, 'url', e.target.value)}
+                        placeholder="https://example.com"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(link.url, '_blank')}
+                        disabled={!link.url}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSourceLink(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Input
+                      value={link.description || ""}
+                      onChange={(e) => handleUpdateSourceLink(index, 'description', e.target.value)}
+                      placeholder="Optional description"
+                    />
+                  </div>
+                ))}
+
+                {/* Add new source link */}
+                <div className="border-2 border-dashed rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="url"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="https://example.com"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddSourceLink}
+                      disabled={!newLinkUrl.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Input
+                    value={newLinkDescription}
+                    onChange={(e) => setNewLinkDescription(e.target.value)}
+                    placeholder="Optional description"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

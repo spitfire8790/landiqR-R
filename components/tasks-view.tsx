@@ -31,6 +31,7 @@ import type {
   Task,
   Responsibility,
   TaskAllocation,
+  TaskSourceLink,
   Group,
   Category,
   Person,
@@ -47,6 +48,7 @@ import {
   deleteResponsibility,
   createTaskAllocation,
   deleteTaskAllocation,
+  createTaskSourceLink,
 } from "@/lib/data-service";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -65,6 +67,7 @@ import {
   Users as UsersIcon,
   Workflow,
   Wrench,
+  ExternalLink,
 } from "lucide-react";
 import { getPeopleAllocatedToCategory } from "@/lib/data-service";
 
@@ -129,13 +132,16 @@ export default function TasksView({
       // Load tasks for specific category
       loadTasksForCategory(selectedCategoryId);
       loadAvailablePeople(selectedCategoryId);
+    } else if (selectedGroupId) {
+      // Load tasks for all categories in the selected group
+      loadTasksForGroup(selectedGroupId);
     } else {
       setTasks([]);
       setResponsibilities({});
       setTaskAllocations({});
       setAvailablePeople([]);
     }
-  }, [selectedCategoryId]);
+  }, [selectedCategoryId, selectedGroupId]);
 
   const loadTasksForCategory = async (categoryId?: string) => {
     setLoading(true);
@@ -148,6 +154,43 @@ export default function TasksView({
       const allocationsData: Record<string, TaskAllocation[]> = {};
 
       for (const task of tasksData) {
+        const [taskResponsibilities, allocations] = await Promise.all([
+          fetchResponsibilities(task.id),
+          fetchTaskAllocations(task.id),
+        ]);
+        responsibilitiesData[task.id] = taskResponsibilities;
+        allocationsData[task.id] = allocations;
+      }
+
+      setResponsibilities(responsibilitiesData);
+      setTaskAllocations(allocationsData);
+    } catch (error) {
+      console.error("Error loading tasks:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load tasks. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTasksForGroup = async (groupId: string) => {
+    setLoading(true);
+    try {
+      const tasksData = await Promise.all(
+        categories
+          .filter((cat) => cat.groupId === groupId)
+          .map((cat) => fetchTasksByCategory(cat.id))
+      );
+      setTasks(tasksData.flat());
+
+      // Load responsibilities and allocations for each task
+      const responsibilitiesData: Record<string, Responsibility[]> = {};
+      const allocationsData: Record<string, TaskAllocation[]> = {};
+
+      for (const task of tasksData.flat()) {
         const [taskResponsibilities, allocations] = await Promise.all([
           fetchResponsibilities(task.id),
           fetchTaskAllocations(task.id),
@@ -204,7 +247,10 @@ export default function TasksView({
     }
   };
 
-  const handleTaskSave = async (taskData: Omit<Task, "id" | "createdAt">) => {
+  const handleTaskSave = async (
+    taskData: Omit<Task, "id" | "createdAt">,
+    sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]
+  ) => {
     try {
       if (editingTask) {
         const updatedTask = await updateTask({ ...editingTask, ...taskData });
@@ -216,7 +262,25 @@ export default function TasksView({
           });
         }
       } else {
-        await handleCreateTask(taskData);
+        // Create new task
+        const newTask = await createTask(taskData);
+        if (newTask && sourceLinks && sourceLinks.length > 0) {
+          // Create source links for the new task
+          for (const linkData of sourceLinks) {
+            await createTaskSourceLink({
+              taskId: newTask.id,
+              url: linkData.url,
+              description: linkData.description,
+            });
+          }
+        }
+        if (newTask) {
+          await loadTasksForCategory(selectedCategoryId);
+          toast({
+            title: "Success",
+            description: "Task created successfully.",
+          });
+        }
       }
       setTaskDialogOpen(false);
       setEditingTask(undefined);
@@ -534,6 +598,14 @@ export default function TasksView({
                                 <span>{totalWeeklyHours}h total estimated</span>
                               </div>
                             )}
+                            {task.sourceLinks && task.sourceLinks.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <ExternalLink className="h-4 w-4" />
+                                <span className="text-sm text-gray-600">
+                                  {task.sourceLinks.length} source{task.sourceLinks.length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -579,14 +651,12 @@ export default function TasksView({
 
                     <CardContent className="space-y-6">
                       {/* Task Allocations */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <UsersIcon className="h-4 w-4" />
-                            Task Allocations
-                          </h4>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Task Allocations</h4>
                           {selectedCategoryId &&
-                            selectedCategoryId !== "all" && (
+                            selectedCategoryId !== "all" &&
+                            isAdmin && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -595,7 +665,7 @@ export default function TasksView({
                                   setTaskAllocationDialogOpen(true);
                                 }}
                               >
-                                <PlusCircle className="h-4 w-4 mr-1" />
+                                <Plus className="mr-1 h-3 w-3" />
                                 Add Person
                               </Button>
                             )}
@@ -610,23 +680,24 @@ export default function TasksView({
                               >
                                 <div className="flex items-center gap-2">
                                   <User className="h-4 w-4" />
-                                  <span>
+                                  <span className="text-sm">
                                     {getPersonName(allocation.personId)}
                                   </span>
                                   {allocation.isLead && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
+                                    <Badge variant="secondary" className="text-xs">
                                       Lead
                                     </Badge>
                                   )}
-                                  <span className="text-sm text-gray-600">
-                                    {allocation.estimatedWeeklyHours}h/week
-                                  </span>
+                                  {allocation.estimatedWeeklyHours > 0 && (
+                                    <span className="text-xs text-gray-500">
+                                      ({allocation.estimatedWeeklyHours}h/week)
+                                    </span>
+                                  )}
                                 </div>
+
                                 {selectedCategoryId &&
-                                  selectedCategoryId !== "all" && (
+                                  selectedCategoryId !== "all" &&
+                                  isAdmin && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -645,31 +716,73 @@ export default function TasksView({
                           </div>
                         ) : (
                           <p className="text-sm text-gray-500">
-                            No people allocated to this task yet
+                            No people allocated yet
                           </p>
                         )}
                       </div>
 
                       <Separator />
 
+                      {/* Source Links */}
+                      {task.sourceLinks && task.sourceLinks.length > 0 && (
+                        <>
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium">Source Links</h4>
+                            <div className="space-y-2">
+                              {task.sourceLinks.map((link) => (
+                                <div
+                                  key={link.id}
+                                  className="flex items-center gap-2 p-2 bg-gray-50 rounded"
+                                >
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(link.url, '_blank')}
+                                    className="h-auto p-0 text-blue-600 hover:text-blue-800"
+                                  >
+                                    <ExternalLink className="h-4 w-4 mr-1" />
+                                  </Button>
+                                  <div className="flex-1 min-w-0">
+                                    <a
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate block"
+                                      title={link.url}
+                                    >
+                                      {link.url}
+                                    </a>
+                                    {link.description && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        {link.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <Separator />
+                        </>
+                      )}
+
                       {/* Responsibilities */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Workflow className="h-4 w-4" />
-                            Responsibilities
-                          </h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Responsibilities</h4>
                           {selectedCategoryId &&
-                            selectedCategoryId !== "all" && (
+                            selectedCategoryId !== "all" &&
+                            isAdmin && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   setSelectedTask(task);
+                                  setEditingResponsibility(undefined);
                                   setResponsibilityDialogOpen(true);
                                 }}
                               >
-                                <PlusCircle className="h-4 w-4 mr-1" />
+                                <Plus className="mr-1 h-3 w-3" />
                                 Add Responsibility
                               </Button>
                             )}
@@ -714,7 +827,8 @@ export default function TasksView({
                                 </div>
 
                                 {selectedCategoryId &&
-                                  selectedCategoryId !== "all" && (
+                                  selectedCategoryId !== "all" &&
+                                  isAdmin && (
                                     <div className="flex gap-1">
                                       <Button
                                         variant="ghost"

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, WorkflowTool, Workflow } from "@/lib/types"
+import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow } from "@/lib/types"
 import { v4 as uuidv4 } from "uuid"
 
 // Check if tables exist and create them if they don't
@@ -61,7 +61,15 @@ export async function ensureTablesExist() {
           description TEXT,
           category_id UUID NOT NULL REFERENCES public.categories(id) ON DELETE CASCADE,
           hours_per_week DECIMAL(5,2) NOT NULL DEFAULT 0,
-          source_link TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Task Source Links table
+        CREATE TABLE IF NOT EXISTS public.task_source_links (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+          url TEXT NOT NULL,
+          description TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
@@ -545,26 +553,60 @@ export async function deleteAllocation(id: string): Promise<boolean> {
 // Tasks
 export async function fetchTasks(): Promise<Task[]> {
   try {
-    const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: true })
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (error) {
-      if (error.message.includes("does not exist")) {
-        await ensureTablesExist()
-        return []
-      }
       console.error("Error fetching tasks:", error)
       return []
     }
 
-    return data.map((task) => ({
+    // Fetch source links for all tasks
+    const tasks = data.map((task) => ({
       id: task.id,
       name: task.name,
       description: task.description || "",
       categoryId: task.category_id,
       hoursPerWeek: task.hours_per_week || 0,
-      sourceLink: task.source_link || "",
       createdAt: task.created_at,
+      sourceLinks: [] as TaskSourceLink[], // Will be populated below
     }))
+
+    // Fetch all source links for these tasks
+    const taskIds = tasks.map(task => task.id)
+    if (taskIds.length > 0) {
+      const { data: linksData, error: linksError } = await supabase
+        .from("task_source_links")
+        .select("*")
+        .in("task_id", taskIds)
+        .order("created_at", { ascending: true })
+
+      if (!linksError && linksData) {
+        // Group source links by task ID
+        const linksByTaskId: Record<string, TaskSourceLink[]> = {}
+        linksData.forEach(link => {
+          if (!linksByTaskId[link.task_id]) {
+            linksByTaskId[link.task_id] = []
+          }
+          linksByTaskId[link.task_id].push({
+            id: link.id,
+            taskId: link.task_id,
+            url: link.url,
+            description: link.description || "",
+            createdAt: link.created_at,
+          })
+        })
+
+        // Assign source links to their respective tasks
+        tasks.forEach(task => {
+          task.sourceLinks = linksByTaskId[task.id] || []
+        })
+      }
+    }
+
+    return tasks
   } catch (error) {
     console.error("Error in fetchTasks:", error)
     return []
@@ -584,14 +626,32 @@ export async function fetchTaskById(id: string): Promise<Task | null> {
       return null
     }
 
+    // Fetch source links for this task
+    const { data: linksData, error: linksError } = await supabase
+      .from("task_source_links")
+      .select("*")
+      .eq("task_id", id)
+      .order("created_at", { ascending: true })
+
+    const sourceLinks: TaskSourceLink[] = []
+    if (!linksError && linksData) {
+      sourceLinks.push(...linksData.map(link => ({
+        id: link.id,
+        taskId: link.task_id,
+        url: link.url,
+        description: link.description || "",
+        createdAt: link.created_at,
+      })))
+    }
+
     return {
       id: data.id,
       name: data.name,
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
-      sourceLink: data.source_link || "",
       createdAt: data.created_at,
+      sourceLinks,
     }
   } catch (error) {
     console.error("Error in fetchTaskById:", error)
@@ -604,7 +664,7 @@ export async function fetchTasksByCategory(categoryId?: string): Promise<Task[]>
     let query = supabase
       .from("tasks")
       .select("*")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
     
     // Only filter by category if a categoryId is provided
     if (categoryId) {
@@ -614,19 +674,54 @@ export async function fetchTasksByCategory(categoryId?: string): Promise<Task[]>
     const { data, error } = await query
 
     if (error) {
-      console.error("Error fetching tasks:", error)
+      console.error("Error fetching tasks by category:", error)
       return []
     }
 
-    return data.map((task) => ({
+    // Fetch source links for all tasks
+    const tasks = data.map((task) => ({
       id: task.id,
       name: task.name,
       description: task.description || "",
       categoryId: task.category_id,
       hoursPerWeek: task.hours_per_week || 0,
-      sourceLink: task.source_link || "",
       createdAt: task.created_at,
+      sourceLinks: [] as TaskSourceLink[], // Will be populated below
     }))
+
+    // Fetch all source links for these tasks
+    const taskIds = tasks.map(task => task.id)
+    if (taskIds.length > 0) {
+      const { data: linksData, error: linksError } = await supabase
+        .from("task_source_links")
+        .select("*")
+        .in("task_id", taskIds)
+        .order("created_at", { ascending: true })
+
+      if (!linksError && linksData) {
+        // Group source links by task ID
+        const linksByTaskId: Record<string, TaskSourceLink[]> = {}
+        linksData.forEach(link => {
+          if (!linksByTaskId[link.task_id]) {
+            linksByTaskId[link.task_id] = []
+          }
+          linksByTaskId[link.task_id].push({
+            id: link.id,
+            taskId: link.task_id,
+            url: link.url,
+            description: link.description || "",
+            createdAt: link.created_at,
+          })
+        })
+
+        // Assign source links to their respective tasks
+        tasks.forEach(task => {
+          task.sourceLinks = linksByTaskId[task.id] || []
+        })
+      }
+    }
+
+    return tasks
   } catch (error) {
     console.error("Error in fetchTasksByCategory:", error)
     return []
@@ -641,7 +736,6 @@ export async function createTask(task: Omit<Task, "id" | "createdAt">): Promise<
       description: task.description,
       category_id: task.categoryId,
       hours_per_week: task.hoursPerWeek,
-      source_link: task.sourceLink,
       created_at: new Date().toISOString(),
     }
 
@@ -662,7 +756,6 @@ export async function createTask(task: Omit<Task, "id" | "createdAt">): Promise<
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
-      sourceLink: data.source_link || "",
       createdAt: data.created_at,
     }
   } catch (error) {
@@ -679,7 +772,6 @@ export async function updateTask(task: Task): Promise<Task | null> {
         name: task.name,
         description: task.description,
         hours_per_week: task.hoursPerWeek,
-        source_link: task.sourceLink,
       })
       .eq("id", task.id)
       .select()
@@ -696,7 +788,6 @@ export async function updateTask(task: Task): Promise<Task | null> {
       description: data.description || "",
       categoryId: data.category_id,
       hoursPerWeek: data.hours_per_week || 0,
-      sourceLink: data.source_link || "",
       createdAt: data.created_at,
     }
   } catch (error) {
@@ -717,6 +808,115 @@ export async function deleteTask(id: string): Promise<boolean> {
     return true
   } catch (error) {
     console.error("Error in deleteTask:", error)
+    return false
+  }
+}
+
+// Task Source Links
+export async function fetchTaskSourceLinks(taskId?: string): Promise<TaskSourceLink[]> {
+  try {
+    let query = supabase
+      .from("task_source_links")
+      .select("*")
+      .order("created_at", { ascending: true })
+    
+    // Only filter by task if a taskId is provided
+    if (taskId) {
+      query = query.eq("task_id", taskId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Error fetching task source links:", error)
+      return []
+    }
+
+    return data.map((link) => ({
+      id: link.id,
+      taskId: link.task_id,
+      url: link.url,
+      description: link.description || "",
+      createdAt: link.created_at,
+    }))
+  } catch (error) {
+    console.error("Error in fetchTaskSourceLinks:", error)
+    return []
+  }
+}
+
+export async function createTaskSourceLink(link: Omit<TaskSourceLink, "id" | "createdAt">): Promise<TaskSourceLink | null> {
+  try {
+    const newLink = {
+      id: uuidv4(),
+      task_id: link.taskId,
+      url: link.url,
+      description: link.description,
+      created_at: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabase.from("task_source_links").insert([newLink]).select().single()
+
+    if (error) {
+      console.error("Error creating task source link:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      taskId: data.task_id,
+      url: data.url,
+      description: data.description || "",
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in createTaskSourceLink:", error)
+    return null
+  }
+}
+
+export async function updateTaskSourceLink(link: TaskSourceLink): Promise<TaskSourceLink | null> {
+  try {
+    const { data, error } = await supabase
+      .from("task_source_links")
+      .update({
+        url: link.url,
+        description: link.description,
+      })
+      .eq("id", link.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating task source link:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      taskId: data.task_id,
+      url: data.url,
+      description: data.description || "",
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in updateTaskSourceLink:", error)
+    return null
+  }
+}
+
+export async function deleteTaskSourceLink(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("task_source_links").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting task source link:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error deleting task source link:", error)
     return false
   }
 }

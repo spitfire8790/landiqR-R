@@ -244,7 +244,11 @@ export function WorkflowBuilder({
       if (event.key === "Delete" || event.key === "Backspace") {
         // Check if focus is on an input field where Backspace should work normally
         const target = event.target as HTMLElement;
-        const isInputField = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.contentEditable === "true";
+        const isInputField = 
+          target.tagName === "INPUT" || 
+          target.tagName === "TEXTAREA" || 
+          target.contentEditable === "true" ||
+          target.closest('input, textarea, [contenteditable="true"]') !== null;
         
         // Check if any dialog/modal is currently open by looking for dialog elements
         const isDialogOpen = document.querySelector('[role="dialog"]') !== null;
@@ -254,7 +258,15 @@ export function WorkflowBuilder({
           return;
         }
         
-        // Only delete nodes/edges if we're focused on the workflow canvas
+        // Check if we're actually focused on the workflow canvas
+        const workflowCanvas = document.querySelector('.react-flow');
+        if (!workflowCanvas || !workflowCanvas.contains(target)) {
+          return;
+        }
+        
+        // Only prevent default and delete nodes/edges if we're focused on the workflow canvas
+        event.preventDefault();
+        event.stopPropagation();
         setEdges((edges) => edges.filter((edge) => !edge.selected));
         setNodes((nodes) => nodes.filter((node) => !node.selected));
       }
@@ -662,9 +674,12 @@ function StepEditDialog({
       className={`fixed inset-0 z-50 flex items-center justify-center ${
         open ? "" : "hidden"
       }`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-step-dialog-title"
     >
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold mb-2">Edit Step</h3>
+        <h3 id="edit-step-dialog-title" className="text-lg font-semibold mb-2">Edit Step</h3>
         <div className="space-y-3">
           <div>
             <Label>Action</Label>

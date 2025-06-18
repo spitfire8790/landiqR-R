@@ -35,7 +35,15 @@ export interface Task {
   categoryId: string
   hoursPerWeek: number
   createdAt: string
-  sourceLink?: string // Optional link to source material
+  sourceLinks?: TaskSourceLink[] // Array of source links
+}
+
+export interface TaskSourceLink {
+  id: string
+  taskId: string
+  url: string
+  description?: string
+  createdAt: string
 }
 
 export interface Responsibility {
