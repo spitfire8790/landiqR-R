@@ -20,7 +20,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { WorkflowStep, Person } from "@/lib/types"
+import type { Person } from "@/lib/types"
+
+// Define WorkflowStep interface locally since it's not exported from lib/types
+interface WorkflowStep {
+  id: string
+  name: string
+  description: string
+  order: number
+  status: "pending" | "in_progress" | "completed" | "blocked"
+  responsiblePersonId?: string
+  estimatedHours?: number
+  actualHours?: number
+  createdAt: string
+  taskId: string
+}
 
 interface WorkflowStepDialogProps {
   open: boolean
@@ -106,8 +120,19 @@ export function WorkflowStepDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+    >
+      <DialogContent 
+        className="sm:max-w-[500px]"
+        onEscapeKeyDown={(event: KeyboardEvent) => {
+          // Only allow plain Escape (no modifiers) to close the dialog
+          if (event.ctrlKey || event.shiftKey || event.altKey) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{step ? "Edit Workflow Step" : "Add New Workflow Step"}</DialogTitle>
           <DialogDescription>

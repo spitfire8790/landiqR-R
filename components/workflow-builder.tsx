@@ -242,6 +242,19 @@ export function WorkflowBuilder({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Delete" || event.key === "Backspace") {
+        // Check if focus is on an input field where Backspace should work normally
+        const target = event.target as HTMLElement;
+        const isInputField = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.contentEditable === "true";
+        
+        // Check if any dialog/modal is currently open by looking for dialog elements
+        const isDialogOpen = document.querySelector('[role="dialog"]') !== null;
+        
+        // Don't handle Delete/Backspace if typing in input fields or if a dialog is open
+        if (isInputField || isDialogOpen) {
+          return;
+        }
+        
+        // Only delete nodes/edges if we're focused on the workflow canvas
         setEdges((edges) => edges.filter((edge) => !edge.selected));
         setNodes((nodes) => nodes.filter((node) => !node.selected));
       }
