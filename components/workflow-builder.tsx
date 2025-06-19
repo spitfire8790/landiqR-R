@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Save, Trash2, Wrench, Users } from "lucide-react";
+import { Plus, Save, Trash2, Wrench, Users, Link, ExternalLink, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Person, WorkflowTool, Workflow, WorkflowData } from "@/lib/types";
 import Image from "next/image";
@@ -159,31 +159,38 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
             <div className="space-y-1">
               {data.tools.map((toolId: string) => {
                 const tool = toolsData.find((t: any) => t.id === toolId);
-                if (!tool) return null;
-
-                return (
-                  <div key={toolId} className="flex items-center gap-2 text-xs">
-                    {tool.icon &&
-                    (tool.icon.startsWith("http") ||
-                      tool.icon.startsWith("/storage/")) ? (
-                      <Image
-                        src={tool.icon}
-                        alt={tool.name}
-                        width={20}
-                        height={20}
-                        className="rounded flex-shrink-0"
-                      />
-                    ) : tool.icon && LucideIcons[tool.icon] ? (
-                      React.createElement(LucideIcons[tool.icon], {
-                        className: "h-5 w-5 text-green-600 flex-shrink-0",
-                      })
-                    ) : (
-                      <Wrench className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    )}
-                    <span className="text-gray-700 truncate">{tool.name}</span>
+                return tool ? (
+                  <div
+                    key={toolId}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <Wrench className="w-3 h-3 text-green-600" />
+                    <span className="text-green-700">{tool.name}</span>
                   </div>
-                );
+                ) : null;
               })}
+            </div>
+          </div>
+        )}
+        {data.links && data.links.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-purple-600 font-medium mb-1">
+              Links ({data.links.length}):
+            </div>
+            <div className="space-y-1">
+              {data.links.slice(0, 2).map((link: any, index: number) => (
+                <div key={index} className="flex items-center gap-2 text-xs">
+                  <ExternalLink className="w-3 h-3 text-purple-600" />
+                  <span className="text-purple-700 truncate" title={link.description || link.url}>
+                    {link.description || "Link"}
+                  </span>
+                </div>
+              ))}
+              {data.links.length > 2 && (
+                <div className="text-xs text-purple-600">
+                  +{data.links.length - 2} more links
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -492,6 +499,7 @@ export function WorkflowBuilder({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">User (Generic)</SelectItem>
+                    <SelectItem value="customer">Customer (Generic)</SelectItem>
                     {people
                       .filter((p) => !newStepPeople.includes(p.id))
                       .map((person) => (
@@ -503,6 +511,43 @@ export function WorkflowBuilder({
                 </Select>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {newStepPeople.map((pid) => {
+                    // Handle generic "User" option
+                    if (pid === "user") {
+                      return (
+                        <Badge key={pid} className="bg-blue-100 text-blue-800">
+                          User{" "}
+                          <button
+                            onClick={() =>
+                              setNewStepPeople(
+                                newStepPeople.filter((id) => id !== pid)
+                              )
+                            }
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      );
+                    }
+
+                    // Handle generic "Customer" option
+                    if (pid === "customer") {
+                      return (
+                        <Badge key={pid} className="bg-blue-100 text-blue-800">
+                          Customer{" "}
+                          <button
+                            onClick={() =>
+                              setNewStepPeople(
+                                newStepPeople.filter((id) => id !== pid)
+                              )
+                            }
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      );
+                    }
+
+                    // Handle actual people
                     const person = people.find((p) => p.id === pid);
                     return person ? (
                       <Badge key={pid} className="bg-blue-100 text-blue-800">
@@ -661,13 +706,27 @@ function StepEditDialog({
   const [selectedTools, setSelectedTools] = useState<string[]>(
     nodeData?.tools || []
   );
+  const [links, setLinks] = useState<any[]>(nodeData?.links || []);
 
   useEffect(() => {
     setAction(nodeData?.action || "");
     setDescription(nodeData?.description || "");
     setSelectedPeople(nodeData?.people || []);
     setSelectedTools(nodeData?.tools || []);
+    setLinks(nodeData?.links || []);
   }, [nodeData, open]);
+
+  const handleAddLink = () => {
+    setLinks([...links, { id: Date.now().toString(), url: "", description: "" }]);
+  };
+
+  const handleRemoveLink = (index: number) => {
+    setLinks(links.filter((_, i) => i !== index));
+  };
+
+  const handleLinkChange = (index: number, field: string, value: string) => {
+    setLinks(links.map((link, i) => (i === index ? { ...link, [field]: value } : link)));
+  };
 
   return (
     <div
@@ -711,6 +770,7 @@ function StepEditDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="user">User (Generic)</SelectItem>
+                <SelectItem value="customer">Customer (Generic)</SelectItem>
                 {people
                   .filter((p) => !selectedPeople.includes(p.id))
                   .map((person) => (
@@ -727,6 +787,24 @@ function StepEditDialog({
                   return (
                     <Badge key={pid} className="bg-blue-100 text-blue-800">
                       User{" "}
+                      <button
+                        onClick={() =>
+                          setSelectedPeople(
+                            selectedPeople.filter((id) => id !== pid)
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  );
+                }
+
+                // Handle generic "Customer" option
+                if (pid === "customer") {
+                  return (
+                    <Badge key={pid} className="bg-blue-100 text-blue-800">
+                      Customer{" "}
                       <button
                         onClick={() =>
                           setSelectedPeople(
@@ -798,6 +876,30 @@ function StepEditDialog({
               })}
             </div>
           </div>
+          <div>
+            <Label>Links</Label>
+            {links.map((link, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  value={link.url}
+                  onChange={(e) => handleLinkChange(index, "url", e.target.value)}
+                  placeholder="Enter link URL"
+                />
+                <Input
+                  value={link.description}
+                  onChange={(e) => handleLinkChange(index, "description", e.target.value)}
+                  placeholder="Enter link description"
+                />
+                <button onClick={() => handleRemoveLink(index)}>
+                  <X className="h-4 w-4 text-red-600" />
+                </button>
+              </div>
+            ))}
+            <Button onClick={handleAddLink} variant="outline" className="w-full">
+              <Link className="h-4 w-4 mr-2" />
+              Add Link
+            </Button>
+          </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -810,6 +912,7 @@ function StepEditDialog({
                 description,
                 people: selectedPeople,
                 tools: selectedTools,
+                links,
               });
               onOpenChange(false);
             }}

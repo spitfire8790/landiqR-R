@@ -16,12 +16,14 @@ import {
   ListPlus,
   CheckSquare,
   MessageCircle,
+  GitBranch,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
 import { PersonDialog } from "@/components/person-dialog";
 import { AllocationDialog } from "@/components/allocation-dialog";
 import { SimpleTaskDialog } from "@/components/simple-task-dialog";
+import { WorkflowDialog } from "@/components/workflow-dialog";
 import DraggableChatModal from "@/components/draggable-chat-modal";
 import { useAuth } from "@/contexts/auth-context";
 import type { Person, Category, Allocation, Group, Task } from "@/lib/types";
@@ -31,6 +33,7 @@ import CategoriesTable from "@/components/categories-table";
 import PeopleTable from "@/components/people-table";
 import ResponsibilityChart from "@/components/responsibility-chart";
 import SimpleTasksView from "@/components/simple-tasks-view";
+import WorkflowsTable from "@/components/workflows-table";
 import {
   fetchGroups,
   createGroup,
@@ -51,6 +54,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  createTaskAllocation,
   ensureTablesExist,
 } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
@@ -73,9 +77,12 @@ export default function Dashboard() {
   const [personDialogOpen, setPersonDialogOpen] = useState(false);
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("orgchart");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedWorkflowForDialog, setSelectedWorkflowForDialog] = useState<{workflow: any, task: Task} | null>(null);
 
   const { toast } = useToast();
   const { logout, isAdmin, userRole } = useAuth();
@@ -86,6 +93,43 @@ export default function Dashboard() {
       title: "Logged out",
       description: "You have been successfully logged out.",
     });
+  };
+
+  // Workflow handlers
+  const handleViewWorkflow = (workflow: any) => {
+    // Find the task associated with this workflow
+    const task = tasks.find(t => t.id === workflow.taskId);
+    if (task) {
+      setSelectedWorkflowForDialog({ workflow, task });
+      setWorkflowDialogOpen(true);
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not find the task associated with this workflow.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditWorkflow = (workflow: any) => {
+    // Find the task associated with this workflow
+    const task = tasks.find(t => t.id === workflow.taskId);
+    if (task) {
+      setSelectedWorkflowForDialog({ workflow, task });
+      setWorkflowDialogOpen(true);
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not find the task associated with this workflow.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateNewWorkflow = () => {
+    // Open WorkflowDialog without a selected workflow (create mode)
+    setSelectedWorkflowForDialog(null);
+    setWorkflowDialogOpen(true);
   };
 
   // Initialize database and fetch data
@@ -134,8 +178,6 @@ export default function Dashboard() {
 
     initializeAndLoadData();
   }, [dataRefreshTrigger, toast]); // Re-fetch data when dataRefreshTrigger changes
-
-  // This useEffect was added incorrectly in the previous edit, removing it
 
   // Function to refresh data
   const refreshData = () => {
@@ -404,14 +446,51 @@ export default function Dashboard() {
     }
   };
 
-  const addTaskHandler = async (taskData: Omit<Task, "id" | "createdAt">) => {
+  const addTaskHandler = async (taskData: Omit<Task, "id" | "createdAt">, allocatedPeople: string[] = []) => {
     try {
       const newTask = await createTask(taskData);
       if (newTask) {
         setTasks([...tasks, newTask]);
+        
+        // Create task allocations for each allocated person
+        if (allocatedPeople.length > 0) {
+          const allocationPromises = allocatedPeople.map(personId => 
+            createTaskAllocation({
+              taskId: newTask.id,
+              personId: personId,
+              isLead: false,
+              estimatedWeeklyHours: 0
+            })
+          );
+          
+          try {
+            await Promise.all(allocationPromises);
+            toast({
+              title: "Success",
+              description: `Task created successfully with ${allocatedPeople.length} people allocated`,
+            });
+          } catch (allocationError) {
+            console.error("Error creating task allocations:", allocationError);
+            toast({
+              title: "Partial Success",
+              description: "Task created but some allocations failed to save",
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Success",
+            description: "Task created successfully",
+          });
+        }
       }
     } catch (error) {
       console.error("Error creating task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create task",
+        variant: "destructive",
+      });
     }
   };
 
@@ -458,6 +537,7 @@ export default function Dashboard() {
   const handleCategoryClick = (categoryId: string) => {
     // Switch to tasks tab and select the category
     setActiveTab("tasks");
+    setSelectedCategoryId(categoryId);
     // The SimpleTasksView will handle category selection internally
     // We could add state management here if needed for pre-selection
   };
@@ -562,6 +642,14 @@ export default function Dashboard() {
                 Add Task
               </Button>
               <Button
+                onClick={() => setWorkflowDialogOpen(true)}
+                className="bg-black text-white hover:bg-gray-800 transition-colors"
+                size="sm"
+              >
+                <GitBranch className="mr-2 h-4 w-4" />
+                Add Workflow
+              </Button>
+              <Button
                 onClick={() => setChatModalOpen(true)}
                 className="bg-black text-white hover:bg-gray-800 transition-colors"
                 size="sm"
@@ -596,7 +684,7 @@ export default function Dashboard() {
             )}
           >
             <Grid3X3 className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Orgchart</span>
+            <span className="hidden sm:inline">Overview</span>
             <span className="sm:hidden">Chart</span>
           </button>
           <button
@@ -647,6 +735,18 @@ export default function Dashboard() {
           >
             <CheckSquare className="mr-2 h-4 w-4" />
             Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab("workflows")}
+            className={cn(
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
+              activeTab === "workflows"
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
+            )}
+          >
+            <GitBranch className="mr-2 h-4 w-4" />
+            Workflows
           </button>
           <button
             onClick={() => setActiveTab("analytics")}
@@ -724,7 +824,23 @@ export default function Dashboard() {
               categories={categories}
               people={people}
               isAdmin={isAdmin}
+              selectedCategoryId={selectedCategoryId}
               onDataChange={refreshData}
+            />
+          </div>
+        )}
+
+        {activeTab === "workflows" && (
+          <div className="h-full w-full">
+            <WorkflowsTable 
+              groups={groups} 
+              categories={categories} 
+              tasks={tasks} 
+              isAdmin={isAdmin}
+              onDataChange={refreshData}
+              onView={handleViewWorkflow}
+              onEdit={handleEditWorkflow}
+              onCreateNew={handleCreateNewWorkflow}
             />
           </div>
         )}
@@ -769,11 +885,22 @@ export default function Dashboard() {
           <SimpleTaskDialog
             open={taskDialogOpen}
             onOpenChange={setTaskDialogOpen}
-            onSave={(taskData, allocatedPeople) => addTaskHandler(taskData)}
+            onSave={(taskData, allocatedPeople) => addTaskHandler(taskData, allocatedPeople)}
             categories={categories}
             availablePeople={people}
             existingAllocations={[]}
           />
+
+          {workflowDialogOpen && (
+            <WorkflowDialog
+              open={workflowDialogOpen}
+              onOpenChange={setWorkflowDialogOpen}
+              task={selectedWorkflowForDialog?.task}
+              people={people}
+              workflow={selectedWorkflowForDialog?.workflow}
+              isCreateMode={!selectedWorkflowForDialog}
+            />
+          )}
 
           <DraggableChatModal
             open={chatModalOpen}

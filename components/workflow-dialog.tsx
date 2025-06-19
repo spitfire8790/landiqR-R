@@ -62,8 +62,10 @@ const WorkflowBuilderProvider = dynamic(
 interface WorkflowDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  task: Task;
+  task?: Task;
   people: Person[];
+  workflow?: Workflow;
+  isCreateMode?: boolean;
 }
 
 export function WorkflowDialog({
@@ -71,6 +73,8 @@ export function WorkflowDialog({
   onOpenChange,
   task,
   people,
+  workflow,
+  isCreateMode,
 }: WorkflowDialogProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [tools, setTools] = useState<WorkflowTool[]>([]);
@@ -86,16 +90,16 @@ export function WorkflowDialog({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open) {
+    if (open && task) {
       loadData();
     }
-  }, [open, task.id]);
+  }, [open, task?.id]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [workflowsData, toolsData] = await Promise.all([
-        fetchWorkflows(task.id),
+        fetchWorkflows(task?.id),
         fetchWorkflowTools(),
       ]);
       setWorkflows(workflowsData);
@@ -153,7 +157,7 @@ export function WorkflowDialog({
       } else {
         const newWorkflow = await createWorkflow({
           ...workflowData,
-          taskId: task.id,
+          taskId: task?.id || '',
           isActive: true,
         });
         if (newWorkflow) {
@@ -252,7 +256,7 @@ export function WorkflowDialog({
             <WorkflowBuilderProvider
               people={people}
               tools={tools}
-              taskId={task.id}
+              taskId={task?.id ?? ''}
               existingWorkflow={editingWorkflow || viewingWorkflow}
               onSave={handleSaveWorkflow}
             />
@@ -281,28 +285,43 @@ export function WorkflowDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <WorkflowIcon className="h-5 w-5" />
-            Workflows for "{task.name}"
+            {task ? `Workflows for "${task.name}"` : "Create New Workflow"}
           </DialogTitle>
           <DialogDescription>
-            Create and manage interactive workflows for this task. Workflows
-            help define the process flow using available tools and people.
+            {task
+              ? "Create and manage interactive workflows for this task. Workflows help define the process flow using available tools and people."
+              : "Create a new workflow diagram using the available tools and people."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 h-full">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">
-              {workflows.length === 0
-                ? "No workflows created yet"
-                : `${workflows.length} workflow(s)`}
-            </h3>
-            <Button onClick={handleCreateWorkflow}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Workflow
-            </Button>
-          </div>
+          {task && workflows.length === 0 ? (
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">
+                No workflows created yet
+              </h3>
+              <Button onClick={handleCreateWorkflow}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Workflow
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">
+                {task
+                  ? workflows.length === 0
+                    ? "No workflows created yet"
+                    : `${workflows.length} workflow(s)`
+                  : "Create New Workflow"}
+              </h3>
+              <Button onClick={handleCreateWorkflow}>
+                <Plus className="h-4 w-4 mr-2" />
+                {task ? "Create Workflow" : "Create New Workflow"}
+              </Button>
+            </div>
+          )}
 
-          {workflows.length === 0 ? (
+          {task && workflows.length === 0 ? (
             <Card className="p-8 text-center">
               <WorkflowIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No workflows yet</h3>
@@ -318,79 +337,80 @@ export function WorkflowDialog({
           ) : (
             <ScrollArea className="flex-1">
               <div className="space-y-4">
-                {workflows.map((workflow) => (
-                  <Card key={workflow.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <CardTitle className="text-lg">
-                              {workflow.name}
-                            </CardTitle>
-                            <Badge
-                              variant={
-                                workflow.isActive ? "default" : "secondary"
-                              }
+                {task &&
+                  workflows.map((workflow) => (
+                    <Card key={workflow.id}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-lg">
+                                {workflow.name}
+                              </CardTitle>
+                              <Badge
+                                variant={
+                                  workflow.isActive ? "default" : "secondary"
+                                }
+                              >
+                                {workflow.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            {workflow.description && (
+                              <CardDescription className="mt-1">
+                                {workflow.description}
+                              </CardDescription>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span>
+                                Created:{" "}
+                                {format(
+                                  new Date(workflow.createdAt),
+                                  "MMM d, yyyy"
+                                )}
+                              </span>
+                              <span>
+                                Updated:{" "}
+                                {format(
+                                  new Date(workflow.updatedAt),
+                                  "MMM d, yyyy"
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewWorkflow(workflow)}
                             >
-                              {workflow.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </div>
-                          {workflow.description && (
-                            <CardDescription className="mt-1">
-                              {workflow.description}
-                            </CardDescription>
-                          )}
-                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                            <span>
-                              Created:{" "}
-                              {format(
-                                new Date(workflow.createdAt),
-                                "MMM d, yyyy"
-                              )}
-                            </span>
-                            <span>
-                              Updated:{" "}
-                              {format(
-                                new Date(workflow.updatedAt),
-                                "MMM d, yyyy"
-                              )}
-                            </span>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditWorkflow(workflow)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleWorkflowStatus(workflow)}
+                            >
+                              {workflow.isActive ? "Deactivate" : "Activate"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteWorkflow(workflow.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewWorkflow(workflow)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditWorkflow(workflow)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleWorkflowStatus(workflow)}
-                          >
-                            {workflow.isActive ? "Deactivate" : "Activate"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteWorkflow(workflow.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                ))}
+                      </CardHeader>
+                    </Card>
+                  ))}
               </div>
             </ScrollArea>
           )}

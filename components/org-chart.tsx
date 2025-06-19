@@ -237,31 +237,13 @@ export default function OrgChart({
   onAddAllocation,
   onCategoryClick,
 }: OrgChartProps) {
-  const [activeView, setActiveView] = useState("matrix");
-  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(
-    null
-  );
+  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
   const [highlightedOrg, setHighlightedOrg] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-
-  // Tasks state
-  const [selectedCategoryForTasks, setSelectedCategoryForTasks] = useState<
-    string | null
-  >(null);
-  const [categoryTasks, setCategoryTasks] = useState<Task[]>([]);
-  const [taskAllocations, setTaskAllocations] = useState<{
-    [taskId: string]: TaskAllocation[];
-  }>({});
-  const [loadingTasks, setLoadingTasks] = useState(false);
-
-  // State for all tasks and task allocations (for permanent display)
-  const [allTasksByCategoryId, setAllTasksByCategoryId] = useState<{
-    [categoryId: string]: Task[];
-  }>({});
-  const [allTaskAllocationsByTaskId, setAllTaskAllocationsByTaskId] = useState<{
-    [taskId: string]: TaskAllocation[];
-  }>({});
-  const [loadingAllTasks, setLoadingAllTasks] = useState(false);
+  const [selectedCategoryForTasks, setSelectedCategoryForTasks] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskAllocations, setTaskAllocations] = useState<TaskAllocation[]>([]);
+  const [allTasksData, setAllTasksData] = useState<{ [categoryId: string]: { tasks: Task[], allocations: TaskAllocation[] } }>({});
 
   // State for drag and drop ordering
   const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
@@ -417,14 +399,14 @@ export default function OrgChart({
   // Get people from task allocations for a specific category and organization
   const getPeopleFromTaskAllocations = (categoryId: string, org: string) => {
     // First check if we have the selected category data loaded
-    if (selectedCategoryForTasks === categoryId && categoryTasks.length > 0) {
+    if (selectedCategoryForTasks === categoryId && tasks.length > 0) {
       // Use the selected category data
-      const taskIds = categoryTasks.map((task) => task.id);
+      const taskIds = tasks.map((task) => task.id);
 
       // Get all people IDs from task allocations for these tasks
       const personIds = new Set<string>();
       taskIds.forEach((taskId) => {
-        const allocations = taskAllocations[taskId] || [];
+        const allocations = taskAllocations.filter((a) => a.taskId === taskId);
         allocations.forEach((allocation) => {
           // Apply person filter if selected
           if (selectedPersonId && allocation.personId !== selectedPersonId) {
@@ -459,17 +441,19 @@ export default function OrgChart({
     }
     // Otherwise, check if we have all tasks data loaded
     else if (
-      allTasksByCategoryId[categoryId] &&
-      allTasksByCategoryId[categoryId].length > 0
+      allTasksData[categoryId] &&
+      allTasksData[categoryId].tasks.length > 0
     ) {
       // Use the all tasks data
-      const tasks = allTasksByCategoryId[categoryId];
+      const tasks = allTasksData[categoryId].tasks;
       const taskIds = tasks.map((task) => task.id);
 
       // Get all people IDs from task allocations for these tasks
       const personIds = new Set<string>();
       taskIds.forEach((taskId) => {
-        const allocations = allTaskAllocationsByTaskId[taskId] || [];
+        const allocations = allTasksData[categoryId].allocations.filter(
+          (a) => a.taskId === taskId
+        );
         allocations.forEach((allocation) => {
           // Apply person filter if selected
           if (selectedPersonId && allocation.personId !== selectedPersonId) {
@@ -514,63 +498,50 @@ export default function OrgChart({
 
   // Load tasks for selected category
   const loadTasksForCategory = async (categoryId: string) => {
-    setLoadingTasks(true);
-    try {
-      const tasksData = await fetchTasksByCategory(categoryId);
-      setCategoryTasks(tasksData);
+    const tasksData = await fetchTasksByCategory(categoryId);
+    setTasks(tasksData);
 
-      // Load allocations for each task
-      const allocationsData: Record<string, TaskAllocation[]> = {};
-      for (const task of tasksData) {
-        const allocations = await fetchTaskAllocations(task.id);
-        allocationsData[task.id] = allocations;
-      }
-      setTaskAllocations(allocationsData);
-    } catch (error) {
-      console.error("Error loading tasks:", error);
-      setCategoryTasks([]);
-      setTaskAllocations({});
-    } finally {
-      setLoadingTasks(false);
+    // Load allocations for each task
+    const allocationsData: TaskAllocation[] = [];
+    for (const task of tasksData) {
+      const allocations = await fetchTaskAllocations(task.id);
+      allocationsData.push(...allocations);
     }
+    setTaskAllocations(allocationsData);
   };
 
   // Load all tasks and task allocations for all categories
   const loadAllTasksAndAllocations = async () => {
     if (categories.length === 0) return;
 
-    setLoadingAllTasks(true);
     try {
-      const tasksByCategoryId: Record<string, Task[]> = {};
-      const allocationsByTaskId: Record<string, TaskAllocation[]> = {};
+      const tasksData: Record<string, { tasks: Task[], allocations: TaskAllocation[] }> = {};
 
       // Load tasks for each category
       for (const category of categories) {
-        const tasksData = await fetchTasksByCategory(category.id);
-        tasksByCategoryId[category.id] = tasksData;
+        const tasks = await fetchTasksByCategory(category.id);
+        tasksData[category.id] = { tasks, allocations: [] };
 
         // Load allocations for each task
-        for (const task of tasksData) {
+        for (const task of tasks) {
           const allocations = await fetchTaskAllocations(task.id);
-          allocationsByTaskId[task.id] = allocations;
+          tasksData[category.id].allocations.push(...allocations);
         }
       }
 
-      setAllTasksByCategoryId(tasksByCategoryId);
-      setAllTaskAllocationsByTaskId(allocationsByTaskId);
+      setAllTasksData(tasksData);
     } catch (error) {
       console.error("Error loading all tasks and allocations:", error);
-    } finally {
-      setLoadingAllTasks(false);
     }
   };
+
   // Handle category click for tasks
   const handleCategoryClickForTasks = (categoryId: string) => {
     if (selectedCategoryForTasks === categoryId) {
       // If already selected, deselect
       setSelectedCategoryForTasks(null);
-      setCategoryTasks([]);
-      setTaskAllocations({});
+      setTasks([]);
+      setTaskAllocations([]);
     } else {
       // Select new category
       setSelectedCategoryForTasks(categoryId);
@@ -696,496 +667,231 @@ export default function OrgChart({
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden p-2 sm:p-4">
-              {/* Custom Tab Navigation for Matrix/Org View */}
-              <div className="grid grid-cols-2 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg flex-shrink-0">
-                <button
-                  onClick={() => setActiveView("matrix")}
-                  className={cn(
-                    "py-2 px-4 text-sm font-medium transition-colors rounded-md",
-                    activeView === "matrix"
-                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow"
-                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
-                  )}
-                >
-                  Matrix View
-                </button>
-                <button
-                  onClick={() => setActiveView("org")}
-                  className={cn(
-                    "py-2 px-4 text-sm font-medium transition-colors rounded-md",
-                    activeView === "org"
-                      ? "bg-white dark:bg-gray-700 shadow-md text-black dark:text-white dark:neon-glow"
-                      : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
-                  )}
-                >
-                  Organisation View
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-hidden min-h-0">
-                <AnimatePresence mode="wait">
+              {categories.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center">
                   <motion.div
-                    key={activeView}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
-                    className="h-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-12 px-6 flex flex-col items-center"
                   >
-                    {activeView === "matrix" ? (
-                      <div className="h-full">
-                        {categories.length === 0 ? (
-                          <div className="flex-1 flex items-center justify-center">
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="text-center py-12 px-6 flex flex-col items-center"
-                            >
-                              {groups.length === 0 ? (
-                                <>
-                                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                    No groups or categories defined yet.
-                                  </p>
-                                  <Button
-                                    onClick={onAddGroup}
-                                    className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
-                                  >
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add First Group
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                    You have groups but no categories yet.
-                                  </p>
-                                  <Button
-                                    onClick={onAddCategory}
-                                    className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
-                                  >
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add First Category
-                                  </Button>
-                                </>
-                              )}
-                            </motion.div>
-                          </div>
-                        ) : (
-                          <div className="overflow-auto h-full">
-                            <div className="w-full p-4">
-                              {/* Matrix Header Row - Organizations as columns */}
-                              <div className="grid gap-2 mb-4 sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pb-2">
-                                <div 
-                                  className="grid gap-2"
-                                  style={{ gridTemplateColumns: `repeat(${organisations.length}, 1fr)` }}
-                                >
-                                  {/* Organization column headers */}
-                                  {organisations.map((org) => (
-                                    <motion.div
-                                      key={org}
-                                      className={cn(
-                                        "p-3 rounded-lg font-medium shadow-sm border cursor-pointer transition-all duration-200 text-center",
-                                        getOrgColor(org, highlightedOrg === org)
-                                      )}
-                                      whileHover={{ scale: 1.02 }}
-                                      onClick={() =>
-                                        setHighlightedOrg(
-                                          highlightedOrg === org ? null : org
-                                        )
-                                      }
-                                    >
-                                      {org}
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Groups and Categories as rows */}
-                              {orderedGroups.map((group) => {
-                                const groupCategories = getCategoriesForGroup(group.id);
-                                if (groupCategories.length === 0) return null;
-
-                                return (
-                                  <div key={group.id} className="mb-6">
-                                    {/* Group Header Row - Full Width */}
-                                    <div className="mb-4">
-                                      <div className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 p-4 rounded-lg shadow-lg border border-slate-500 w-full">
-                                        <div className="flex items-center justify-center gap-2 text-white drop-shadow-sm font-bold">
-                                          {React.createElement(
-                                            resolveGroupIcon(group.icon),
-                                            { className: "h-5 w-5" }
-                                          )}
-                                          <span className="text-lg">
-                                            {group.name}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Category Rows */}
-                                    {groupCategories.map((category) => (
-                                      <div key={category.id} className="mb-4">
-                                        {/* Category Header - Full Width Divider */}
-                                        <div
-                                          className={cn(
-                                            "p-3 mb-2 border rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-2 w-full",
-                                            highlightedCategory === category.id
-                                              ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white border-purple-500"
-                                              : "bg-slate-400 text-white hover:bg-slate-500 border-slate-300"
-                                          )}
-                                          onClick={() => {
-                                            setHighlightedCategory(
-                                              highlightedCategory === category.id ? null : category.id
-                                            );
-                                            if (onCategoryClick) {
-                                              onCategoryClick(category.id);
-                                            }
-                                          }}
-                                        >
-                                          <span className="text-sm font-medium">
-                                            {category.name}
-                                          </span>
-                                        </div>
-
-                                        {/* Organization-Category Intersection Cells */}
-                                        <div 
-                                          className="grid gap-2"
-                                          style={{ gridTemplateColumns: `repeat(${organisations.length}, 1fr)` }}
-                                        >
-                                          {organisations.map((org) => {
-                                            // Get allocations for this category and organization
-                                            const directAllocations = getAllocationsForCategoryAndOrg(category.id, org);
-                                            const taskAllocations = getPeopleFromTaskAllocations(category.id, org);
-
-                                            // Combine both types of allocations, avoiding duplicates
-                                            const allAllocations = [...directAllocations];
-                                            taskAllocations.forEach((taskAlloc) => {
-                                              if (!directAllocations.some((directAlloc) => directAlloc.personId === taskAlloc.personId)) {
-                                                allAllocations.push(taskAlloc);
-                                              }
-                                            });
-
-                                            const isHighlighted = isCellHighlighted(category.id, org);
-
-                                            return (
-                                              <motion.div
-                                                key={`${category.id}-${org}`}
-                                                className={cn(
-                                                  "border rounded-lg shadow-sm transition-all duration-200 cursor-pointer overflow-hidden min-h-[100px]",
-                                                  isHighlighted
-                                                    ? "bg-gray-50 dark:bg-gray-700 border-gray-400 dark:border-gray-500 shadow-md"
-                                                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600"
-                                                )}
-                                                whileHover={{
-                                                  y: -1,
-                                                  boxShadow: "0 4px 12px -2px rgba(0, 0, 0, 0.1)",
-                                                }}
-                                                onClick={(e) => {
-                                                  if (!(e.target as HTMLElement).closest("button")) {
-                                                    handleCategoryClickForTasks(category.id);
-                                                    if (allAllocations.length === 0) {
-                                                      onAddAllocation();
-                                                    }
-                                                  }
-                                                }}
-                                              >
-                                                {/* Allocation Content */}
-                                                <div className="p-3">
-                                                  {allAllocations.length > 0 ? (
-                                                    <div className="space-y-2">
-                                                      {allAllocations.map((allocation) => {
-                                                        const person = people.find((p) => p.id === allocation.personId);
-                                                        if (!person) return null;
-
-                                                        return (
-                                                          <motion.div
-                                                            key={allocation.id}
-                                                            className="flex items-center justify-between gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm group"
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, y: -10 }}
-                                                          >
-                                                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                              <User className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                              <span className="text-gray-700 dark:text-gray-300 font-medium">
-                                                                {person.name}
-                                                              </span>
-                                                              {allocation.isLead && (
-                                                                <Star className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-                                                              )}
-                                                            </div>
-                                                            <motion.div
-                                                              whileHover={{ scale: 1.1 }}
-                                                              whileTap={{ scale: 0.9 }}
-                                                            >
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => onDeleteAllocation(allocation.id)}
-                                                                className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                              >
-                                                                <X className="h-4 w-4" />
-                                                                <span className="sr-only">Remove</span>
-                                                              </Button>
-                                                            </motion.div>
-                                                          </motion.div>
-                                                        );
-                                                      })}
-                                                    </div>
-                                                  ) : (
-                                                    <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
-                                                      <div className="text-center">
-                                                        <User className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                                                        <span className="text-sm">No allocations</span>
-                                                      </div>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </motion.div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })}
-
-                              {/* No groups message */}
-                              {orderedGroups.length === 0 && (
-                                <div className="text-center py-8">
-                                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                    No groups defined yet.
-                                  </p>
-                                  <Button
-                                    onClick={onAddGroup}
-                                    className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
-                                  >
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add First Group
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                    {groups.length === 0 ? (
+                      <>
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                          No groups or categories defined yet.
+                        </p>
+                        <Button
+                          onClick={onAddGroup}
+                          className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add First Group
+                        </Button>
+                      </>
                     ) : (
-                      /* Organisation View - Mobile optimised */
-                      <div className="h-full flex flex-col">
-                        <div className="flex-1 overflow-y-auto min-h-0">
-                          <div className="space-y-3 sm:space-y-4 p-2 sm:p-4 pb-2 min-h-full">
-                            {organisations.map((org) => (
-                              <motion.div
-                                key={org}
-                                className={cn(
-                                  "border rounded-lg overflow-hidden shadow-lg",
-                                  getOrgColor(org, highlightedOrg === org)
-                                )}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5 }}
-                              >
-                                <div className="p-3 sm:p-4 bg-white bg-opacity-30 backdrop-blur-sm">
-                                  <h3 className="text-lg font-bold">{org}</h3>
-                                </div>
-                                <div className="p-3 sm:p-4">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {orderedGroups.map((group) => {
-                                      const groupCategories =
-                                        getCategoriesForGroup(group.id);
-
-                                      if (groupCategories.length === 0)
-                                        return null;
-
-                                      const hasAllocations =
-                                        groupCategories.some((category) =>
-                                          allocations.some(
-                                            (a) =>
-                                              a.categoryId === category.id &&
-                                              people.find(
-                                                (p) => p.id === a.personId
-                                              )?.organisation === org
-                                          )
-                                        );
-
-                                      if (!hasAllocations) return null;
-
-                                      return (
-                                        <motion.div
-                                          key={`${org}-${group.id}`}
-                                          className="border bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
-                                          whileHover={{
-                                            y: -5,
-                                            boxShadow:
-                                              "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-                                          }}
-                                          transition={{ duration: 0.2 }}
-                                        >
-                                          <div className="bg-gray-100 dark:bg-gray-700 p-3 border-b dark:border-gray-600">
-                                            <h4 className="flex items-center gap-1 font-bold text-gray-900 dark:text-white">
-                                              {React.createElement(
-                                                resolveGroupIcon(group.icon),
-                                                { className: "h-4 w-4" }
-                                              )}
-                                              <span>{group.name}</span>
-                                            </h4>
-                                          </div>
-                                          <div className="p-3 space-y-4">
-                                            {groupCategories.map((category) => {
-                                              const categoryAllocations =
-                                                allocations.filter(
-                                                  (a) =>
-                                                    a.categoryId ===
-                                                      category.id &&
-                                                    people.find(
-                                                      (p) => p.id === a.personId
-                                                    )?.organisation === org
-                                                );
-
-                                              if (
-                                                categoryAllocations.length === 0
-                                              )
-                                                return null;
-
-                                              return (
-                                                <div
-                                                  key={category.id}
-                                                  className="border-t dark:border-gray-600 pt-3"
-                                                >
-                                                  <div className="flex justify-between items-center mb-2">
-                                                    <h5 className="font-medium text-sm text-gray-700 dark:text-gray-300">
-                                                      {category.name}
-                                                    </h5>
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      onClick={() => {
-                                                        onAddAllocation();
-                                                      }}
-                                                      className="h-6 w-6 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                                    >
-                                                      <PlusCircle className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                      <span className="sr-only">
-                                                        Add allocation
-                                                      </span>
-                                                    </Button>
-                                                  </div>
-                                                  <ul className="space-y-2">
-                                                    {categoryAllocations.map(
-                                                      (allocation) => {
-                                                        const person =
-                                                          people.find(
-                                                            (p) =>
-                                                              p.id ===
-                                                              allocation.personId
-                                                          );
-                                                        return person ? (
-                                                          <motion.div
-                                                            key={allocation.id}
-                                                            className="flex justify-between items-center p-1.5 rounded-md border shadow-sm bg-white dark:bg-gray-700 mb-1 border-gray-200 dark:border-gray-600"
-                                                            whileHover={{
-                                                              scale: 1.02,
-                                                              backgroundColor:
-                                                                "#f9fafb",
-                                                            }}
-                                                            transition={{
-                                                              duration: 0.2,
-                                                            }}
-                                                          >
-                                                            <div className="flex items-center gap-0.5">
-                                                              {allocation.isLead && (
-                                                                <TooltipProvider>
-                                                                  <Tooltip>
-                                                                    <TooltipTrigger
-                                                                      asChild
-                                                                    >
-                                                                      <Star className="h-3 w-3 text-yellow-400 flex-shrink-0" />
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                      <p>
-                                                                        Lead
-                                                                      </p>
-                                                                    </TooltipContent>
-                                                                  </Tooltip>
-                                                                </TooltipProvider>
-                                                              )}
-                                                              <div>
-                                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                                  {getFirstName(
-                                                                    person.name
-                                                                  )}
-                                                                </div>
-                                                                {person.role && (
-                                                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    {
-                                                                      person.role
-                                                                    }
-                                                                  </div>
-                                                                )}
-                                                              </div>
-                                                            </div>
-                                                            <motion.div
-                                                              whileHover={{
-                                                                scale: 1.1,
-                                                              }}
-                                                              whileTap={{
-                                                                scale: 0.9,
-                                                              }}
-                                                            >
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                  onDeleteAllocation(
-                                                                    allocation.id
-                                                                  )
-                                                                }
-                                                                className="h-6 w-6 hover:bg-gray-200 dark:hover:bg-gray-600"
-                                                              >
-                                                                <X className="h-4 w-4" />
-                                                                <span className="sr-only">
-                                                                  Remove
-                                                                </span>
-                                                              </Button>
-                                                            </motion.div>
-                                                          </motion.div>
-                                                        ) : null;
-                                                      }
-                                                    )}
-                                                  </ul>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </motion.div>
-                                      );
-                                    })}
-                                    {groups.length === 0 && (
-                                      <div className="col-span-3 text-center py-8">
-                                        <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                          No groups defined yet.
-                                        </p>
-                                        <Button
-                                          onClick={onAddGroup}
-                                          className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
-                                        >
-                                          <PlusCircle className="mr-2 h-4 w-4" />
-                                          Add First Group
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      <>
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                          You have groups but no categories yet.
+                        </p>
+                        <Button
+                          onClick={onAddCategory}
+                          className="bg-gray-800 hover:bg-gray-700 text-white dark:bg-pink-600 dark:hover:bg-pink-700 dark:neon-pink-glow"
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add First Category
+                        </Button>
+                      </>
                     )}
                   </motion.div>
-                </AnimatePresence>
-              </div>
+                </div>
+              ) : (
+                <div className="overflow-auto h-full">
+                  <div className="w-full p-4">
+                    {/* Matrix Header - Groups and Categories across the top */}
+                    <div className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pb-4 mb-4">
+                      <div className="flex gap-4 flex-wrap">
+                        {orderedGroups.map((group) => {
+                          const groupCategories = getCategoriesForGroup(group.id);
+                          if (groupCategories.length === 0) return null;
+
+                          return (
+                            <div key={group.id} className="flex-shrink-0 mb-4">
+                              {/* Group Header */}
+                              <div className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 p-3 rounded-t-lg shadow-lg border border-slate-500 min-w-[200px]">
+                                <div className="flex items-center justify-center gap-2 text-white drop-shadow-sm font-bold">
+                                  {React.createElement(
+                                    resolveGroupIcon(group.icon),
+                                    { className: "h-4 w-4" }
+                                  )}
+                                  <span className="text-sm">
+                                    {group.name}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Categories under this group */}
+                              <div className="flex">
+                                {groupCategories.map((category, index) => (
+                                  <div 
+                                    key={category.id} 
+                                    className={cn(
+                                      "border-l border-r border-b border-slate-300 dark:border-slate-600 min-w-[150px] bg-white dark:bg-gray-800",
+                                      index === 0 && "rounded-bl-lg",
+                                      index === groupCategories.length - 1 && "rounded-br-lg"
+                                    )}
+                                  >
+                                    <div
+                                      className={cn(
+                                        "p-2 cursor-pointer transition-all duration-200 text-center border-b border-slate-200 dark:border-slate-600",
+                                        highlightedCategory === category.id
+                                          ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white"
+                                          : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                                      )}
+                                      onClick={() => {
+                                        setHighlightedCategory(
+                                          highlightedCategory === category.id ? null : category.id
+                                        );
+                                        if (onCategoryClick) {
+                                          onCategoryClick(category.id);
+                                        }
+                                      }}
+                                    >
+                                      <span className="text-xs font-medium">
+                                        {category.name}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* People allocated to this category */}
+                                    <div className="p-3 min-h-[200px]">
+                                      {(() => {
+                                        // Get all allocations for this category (from all organizations)
+                                        const allOrgs = ['PDNSW', 'WSP', 'Giraffe'];
+                                        const allAllocations: any[] = [];
+                                        
+                                        allOrgs.forEach(org => {
+                                          const directAllocations = getAllocationsForCategoryAndOrg(category.id, org);
+                                          const taskAllocations = getPeopleFromTaskAllocations(category.id, org);
+                                          
+                                          // Add direct allocations
+                                          directAllocations.forEach(alloc => {
+                                            if (!allAllocations.some(existing => existing.id === alloc.id)) {
+                                              allAllocations.push(alloc);
+                                            }
+                                          });
+                                          
+                                          // Add task allocations (avoiding duplicates)
+                                          taskAllocations.forEach(taskAlloc => {
+                                            if (!allAllocations.some(existing => existing.personId === taskAlloc.personId)) {
+                                              allAllocations.push(taskAlloc);
+                                            }
+                                          });
+                                        });
+
+                                        if (allAllocations.length > 0) {
+                                          return (
+                                            <div className="space-y-2">
+                                              {allAllocations.map((allocation) => {
+                                                const person = people.find((p) => p.id === allocation.personId);
+                                                if (!person) return null;
+
+                                                // Get organization color
+                                                const getPersonOrgColor = (org: string) => {
+                                                  switch (org) {
+                                                    case 'PDNSW':
+                                                      return 'text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700';
+                                                    case 'WSP':
+                                                      return 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700';
+                                                    case 'Giraffe':
+                                                      return 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700';
+                                                    default:
+                                                      return 'text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600';
+                                                  }
+                                                };
+
+                                                return (
+                                                  <motion.div
+                                                    key={allocation.id}
+                                                    className={cn(
+                                                      "flex items-center justify-between gap-2 p-2 rounded text-xs group border",
+                                                      getPersonOrgColor(person.organisation)
+                                                    )}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                  >
+                                                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                                                      <User className="h-3 w-3 flex-shrink-0" />
+                                                      <span className="font-medium truncate">
+                                                        {getFirstName(person.name)}
+                                                      </span>
+                                                      {allocation.isLead && (
+                                                        <Star className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                                      )}
+                                                    </div>
+                                                    <motion.div
+                                                      whileHover={{ scale: 1.1 }}
+                                                      whileTap={{ scale: 0.9 }}
+                                                    >
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => onDeleteAllocation(allocation.id)}
+                                                        className="h-5 w-5 hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                      >
+                                                        <X className="h-3 w-3" />
+                                                        <span className="sr-only">Remove</span>
+                                                      </Button>
+                                                    </motion.div>
+                                                  </motion.div>
+                                                );
+                                              })}
+                                            </div>
+                                          );
+                                        } else {
+                                          return (
+                                            <div 
+                                              className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                              onClick={(e) => {
+                                                handleCategoryClickForTasks(category.id);
+                                                onAddAllocation();
+                                              }}
+                                            >
+                                              <div className="text-center">
+                                                <User className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                                                <span className="text-xs">No allocations</span>
+                                                <div className="text-xs text-gray-300 dark:text-gray-600 mt-1">Click to add</div>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                      })()}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* No groups message */}
+                    {orderedGroups.length === 0 && (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                          No groups defined yet.
+                        </p>
+                        <Button
+                          onClick={onAddGroup}
+                          className="bg-black hover:bg-gray-800 text-white dark:bg-cyan-600 dark:hover:bg-cyan-700 dark:neon-glow"
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add First Group
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

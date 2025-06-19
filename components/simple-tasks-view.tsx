@@ -78,6 +78,7 @@ interface SimpleTasksViewProps {
   categories: Category[];
   people: Person[];
   isAdmin: boolean;
+  selectedCategoryId?: string | null;
   onDataChange?: () => void;
 }
 
@@ -94,6 +95,7 @@ export default function SimpleTasksView({
   categories,
   people,
   isAdmin,
+  selectedCategoryId: initialSelectedCategoryId,
   onDataChange,
 }: SimpleTasksViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -121,6 +123,19 @@ export default function SimpleTasksView({
   const [workflowTask, setWorkflowTask] = useState<Task | null>(null);
 
   const { toast } = useToast();
+
+  // Handle initial category selection from prop
+  useEffect(() => {
+    if (initialSelectedCategoryId) {
+      // Find the group that contains this category
+      const category = categories.find((cat) => cat.id === initialSelectedCategoryId);
+      if (category) {
+        setSelectedGroupId(category.groupId);
+        setSelectedCategoryId(initialSelectedCategoryId);
+        setCategoryFilter(initialSelectedCategoryId);
+      }
+    }
+  }, [initialSelectedCategoryId, categories]);
 
   // Get categories for selected group
   const filteredCategories = categories.filter(
@@ -819,12 +834,12 @@ export default function SimpleTasksView({
                         </td>
                         <td className="px-4 py-2">{task.hoursPerWeek}</td>
                         <td className="px-4 py-2">
-                          {task.sourceLink ? (
+                          {task.sourceLinks && task.sourceLinks.length > 0 ? (
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() =>
-                                window.open(task.sourceLink, "_blank")
+                                window.open(task.sourceLinks![0].url, "_blank")
                               }
                               className="p-1 h-auto"
                               title="View source material"

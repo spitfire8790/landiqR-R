@@ -83,6 +83,12 @@ export interface WorkflowTool {
   createdAt: string
 }
 
+export interface WorkflowStepLink {
+  id: string
+  url: string
+  description: string
+}
+
 export interface Workflow {
   id: string
   name: string
@@ -103,6 +109,7 @@ export interface WorkflowNode {
     personId?: string
     toolId?: string
     description?: string
+    links?: WorkflowStepLink[]
     [key: string]: any
   }
 }
