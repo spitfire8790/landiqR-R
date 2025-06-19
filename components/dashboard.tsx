@@ -34,6 +34,7 @@ import PeopleTable from "@/components/people-table";
 import ResponsibilityChart from "@/components/responsibility-chart";
 import SimpleTasksView from "@/components/simple-tasks-view";
 import WorkflowsTable from "@/components/workflows-table";
+import HowToUseButton from "@/components/how-to-use-button";
 import {
   fetchGroups,
   createGroup,
@@ -596,6 +597,8 @@ export default function Dashboard() {
           <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
             {userRole?.toUpperCase()}
           </div>
+          {/* How to Use Button - Available to all users */}
+          <HowToUseButton />
         </div>
         <div className="flex items-center space-x-2">
           {/* Action Buttons - Only show if admin */}
@@ -659,6 +662,7 @@ export default function Dashboard() {
               </Button>
             </>
           )}
+          
           <Button
             onClick={handleLogout}
             variant="outline"
