@@ -113,9 +113,6 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
         )}
         {data.people && data.people.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-blue-600 font-medium mb-1">
-              People:
-            </div>
             <div className="space-y-1">
               {data.people.map((personId: string) => {
                 // Handle generic "User" option
@@ -127,6 +124,19 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
                     >
                       <Users className="h-5 w-5 text-blue-600 flex-shrink-0" />
                       <span className="text-gray-700">User</span>
+                    </div>
+                  );
+                }
+
+                // Handle generic "Customer" option
+                if (personId === "customer") {
+                  return (
+                    <div
+                      key={personId}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <Users className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                      <span className="text-gray-700">Customer</span>
                     </div>
                   );
                 }
@@ -153,9 +163,6 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
         )}
         {data.tools && data.tools.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-green-600 font-medium mb-1">
-              Tools:
-            </div>
             <div className="space-y-1">
               {data.tools.map((toolId: string) => {
                 const tool = toolsData.find((t: any) => t.id === toolId);
@@ -164,7 +171,19 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
                     key={toolId}
                     className="flex items-center gap-2 text-xs"
                   >
-                    <Wrench className="w-3 h-3 text-green-600" />
+                    {tool.icon && 
+                    (tool.icon.startsWith("http") || 
+                     tool.icon.startsWith("/storage/")) ? (
+                      <Image
+                        src={tool.icon}
+                        alt={tool.name}
+                        width={12}
+                        height={12}
+                        className="rounded flex-shrink-0"
+                      />
+                    ) : (
+                      <Wrench className="w-3 h-3 text-green-600" />
+                    )}
                     <span className="text-green-700">{tool.name}</span>
                   </div>
                 ) : null;
@@ -174,9 +193,6 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
         )}
         {data.links && data.links.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-purple-600 font-medium mb-1">
-              Links ({data.links.length}):
-            </div>
             <div className="space-y-1">
               {data.links.slice(0, 2).map((link: any, index: number) => (
                 <div key={index} className="flex items-center gap-2 text-xs">
