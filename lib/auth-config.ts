@@ -19,5 +19,6 @@ export const READONLY_EMAILS: string[] = [
   // e.g. 'viewer@example.com'
   'jonathan.thorpe@dpie.nsw.gov.au',
   'lucy@giraffe.build',
-  'adam@giraffe.build', 
+  'adam@giraffe.build',
+  'loretta.ponting@customerservice.nsw.gov.au', 
 ] 

@@ -11,6 +11,7 @@ import {
   Controls,
   MiniMap,
   Background,
+  BackgroundVariant,
   ConnectionMode,
   Connection,
   ReactFlowProvider,
@@ -28,6 +29,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { RichTextDisplay } from "@/components/ui/rich-text-display";
 import {
   Select,
   SelectContent,
@@ -35,14 +38,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Save, Trash2, Wrench, Users, Link, ExternalLink, X } from "lucide-react";
+import {
+  Plus,
+  Save,
+  Trash2,
+  Wrench,
+  Users,
+  Link,
+  ExternalLink,
+  X,
+  FileText,
+  StickyNote,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Person, WorkflowTool, Workflow, WorkflowData } from "@/lib/types";
 import Image from "next/image";
 import * as LucideIcons from "lucide-react";
 import React from "react";
+import { getOrganizationLogo } from "@/lib/utils";
 
-// Add custom CSS for glow animation
+// Add custom CSS for glow animation and rich text display
 const glowStyles = `
   @keyframes glow {
     0% {
@@ -61,24 +76,111 @@ const glowStyles = `
       box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.25), 0 0 30px rgba(59, 130, 246, 0.15);
     }
   }
+
+  .rich-text-display ul {
+    margin: 0.25em 0;
+    padding-left: 1em;
+    list-style-type: disc;
+  }
+  
+  .rich-text-display ol {
+    margin: 0.25em 0;
+    padding-left: 1em;
+    list-style-type: decimal;
+  }
+  
+  .rich-text-display li {
+    margin: 0.1em 0;
+  }
+  
+  .rich-text-display strong {
+    font-weight: bold;
+  }
+  
+  .rich-text-display em {
+    font-style: italic;
+  }
+  
+  .rich-text-display u {
+    text-decoration: underline;
+  }
 `;
+
+// Helper function to get organization color for step boxes
+const getStepNodeColor = (people: any[], peopleData: any[]) => {
+  if (!people || people.length === 0) {
+    return {
+      bg: "bg-yellow-50",
+      border: "border-yellow-300",
+      selectedBorder: "border-yellow-500",
+      glow: "rgba(251, 191, 36, 0.15)", // yellow
+    };
+  }
+
+  // Get the first real person (not generic user/customer)
+  const firstRealPerson = people.find(
+    (personId) => personId !== "user" && personId !== "customer"
+  );
+
+  if (firstRealPerson) {
+    const person = peopleData.find((p: any) => p.id === firstRealPerson);
+    if (person) {
+      switch (person.organisation) {
+        case "PDNSW":
+          return {
+            bg: "bg-blue-50",
+            border: "border-blue-300",
+            selectedBorder: "border-blue-500",
+            glow: "rgba(59, 130, 246, 0.15)", // blue
+          };
+        case "WSP":
+          return {
+            bg: "bg-red-50",
+            border: "border-red-300",
+            selectedBorder: "border-red-500",
+            glow: "rgba(239, 68, 68, 0.15)", // red
+          };
+        case "Giraffe":
+          return {
+            bg: "bg-orange-50",
+            border: "border-orange-300",
+            selectedBorder: "border-orange-500",
+            glow: "rgba(245, 158, 11, 0.15)", // orange
+          };
+      }
+    }
+  }
+
+  // Default to yellow for generic users or unknown organizations
+  return {
+    bg: "bg-yellow-50",
+    border: "border-yellow-300",
+    selectedBorder: "border-yellow-500",
+    glow: "rgba(251, 191, 36, 0.15)", // yellow
+  };
+};
 
 // Step node component
 const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
   // Access tools from the data passed to the node
   const toolsData = data.toolsData || [];
+  const peopleData = data.peopleData || [];
+  const colors = getStepNodeColor(data.people, peopleData);
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
       <div
-        className={`px-4 py-3 shadow-md rounded-md bg-white border-2 ${
-          selected ? "border-blue-500" : "border-gray-200"
+        className={`px-4 py-3 shadow-md rounded-md ${colors.bg} border-2 ${
+          selected ? colors.selectedBorder : colors.border
         } min-w-[200px] max-w-[280px] cursor-pointer relative`}
         style={{
           animation: selected
             ? "glow-selected 2s ease-in-out infinite alternate"
             : "glow 3s ease-in-out infinite alternate",
+          boxShadow: selected
+            ? `0 0 12px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 30px ${colors.glow}`
+            : `0 0 8px ${colors.glow}, 0 0 15px ${colors.glow}, 0 0 20px ${colors.glow}`,
         }}
       >
         {/* Connection handles */}
@@ -157,6 +259,15 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
                     <span className="text-gray-700 truncate">
                       {person.name}
                     </span>
+                    {getOrganizationLogo(person.organisation) && (
+                      <Image
+                        src={getOrganizationLogo(person.organisation)}
+                        alt={`${person.organisation} logo`}
+                        width={12}
+                        height={12}
+                        className="flex-shrink-0"
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -169,13 +280,10 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
               {data.tools.map((toolId: string) => {
                 const tool = toolsData.find((t: any) => t.id === toolId);
                 return tool ? (
-                  <div
-                    key={toolId}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    {tool.icon && 
-                    (tool.icon.startsWith("http") || 
-                     tool.icon.startsWith("/storage/")) ? (
+                  <div key={toolId} className="flex items-center gap-2 text-xs">
+                    {tool.icon &&
+                    (tool.icon.startsWith("http") ||
+                      tool.icon.startsWith("/storage/")) ? (
                       <Image
                         src={tool.icon}
                         alt={tool.name}
@@ -199,7 +307,10 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
               {data.links.slice(0, 2).map((link: any, index: number) => (
                 <div key={index} className="flex items-center gap-2 text-xs">
                   <ExternalLink className="w-3 h-3 text-purple-600" />
-                  <span className="text-purple-700 truncate" title={link.description || link.url}>
+                  <span
+                    className="text-purple-700 truncate"
+                    title={link.description || link.url}
+                  >
                     {link.description || "Link"}
                   </span>
                 </div>
@@ -210,6 +321,78 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+// Notes node component
+const NotesNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`px-4 py-3 shadow-md rounded-md bg-gray-100 border-2 ${
+          selected ? "border-blue-500" : "border-gray-300"
+        } min-w-[200px] max-w-[280px] cursor-pointer relative`}
+        style={{
+          animation: selected
+            ? "glow-selected 2s ease-in-out infinite alternate"
+            : "glow 3s ease-in-out infinite alternate",
+          boxShadow: selected
+            ? `0 0 12px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.1)`
+            : `0 0 8px rgba(107, 114, 128, 0.2), 0 0 15px rgba(107, 114, 128, 0.1), 0 0 20px rgba(107, 114, 128, 0.05)`,
+        }}
+      >
+        {/* Connection handles */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="bottom"
+          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+        />
+
+        <div className="flex items-center gap-2 font-semibold text-black mb-2">
+          <StickyNote className="h-4 w-4" />
+          <span>Notes</span>
+        </div>
+
+        {data.title && (
+          <div className="font-medium text-black mb-1 text-sm">
+            {data.title}
+          </div>
+        )}
+
+        {data.content && (
+          <RichTextDisplay
+            content={data.content}
+            className="text-xs text-gray-800"
+          />
+        )}
+
+        {!data.title && !data.content && (
+          <div className="text-xs text-gray-600 italic">
+            Click to add notes...
           </div>
         )}
       </div>
@@ -250,6 +433,8 @@ export function WorkflowBuilder({
   const [newStepDescription, setNewStepDescription] = useState("");
   const [newStepPeople, setNewStepPeople] = useState<string[]>([]);
   const [newStepTools, setNewStepTools] = useState<string[]>([]);
+  const [newNotesTitle, setNewNotesTitle] = useState("");
+  const [newNotesContent, setNewNotesContent] = useState("");
   const [loading, setLoading] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -259,6 +444,7 @@ export function WorkflowBuilder({
   const nodeTypes = useMemo(
     () => ({
       step: StepNode,
+      notes: NotesNode,
     }),
     []
   );
@@ -269,26 +455,26 @@ export function WorkflowBuilder({
       if (event.key === "Delete" || event.key === "Backspace") {
         // Check if focus is on an input field where Backspace should work normally
         const target = event.target as HTMLElement;
-        const isInputField = 
-          target.tagName === "INPUT" || 
-          target.tagName === "TEXTAREA" || 
+        const isInputField =
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
           target.contentEditable === "true" ||
           target.closest('input, textarea, [contenteditable="true"]') !== null;
-        
+
         // Check if any dialog/modal is currently open by looking for dialog elements
         const isDialogOpen = document.querySelector('[role="dialog"]') !== null;
-        
+
         // Don't handle Delete/Backspace if typing in input fields or if a dialog is open
         if (isInputField || isDialogOpen) {
           return;
         }
-        
+
         // Check if we're actually focused on the workflow canvas
-        const workflowCanvas = document.querySelector('.react-flow');
+        const workflowCanvas = document.querySelector(".react-flow");
         if (!workflowCanvas || !workflowCanvas.contains(target)) {
           return;
         }
-        
+
         // Only prevent default and delete nodes/edges if we're focused on the workflow canvas
         event.preventDefault();
         event.stopPropagation();
@@ -343,33 +529,42 @@ export function WorkflowBuilder({
     }
   }, [existingWorkflow, tools, people, setNodes, setEdges]);
 
-  // Node click handler
+  // Node click handler - single click for selection only
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    // Single click just selects the node, doesn't open dialog
+    // The selection is handled by ReactFlow automatically
+  }, []);
+
+  // Node double-click handler - opens edit dialog
+  const onNodeDoubleClick: NodeMouseHandler = useCallback((event, node) => {
     setEditingNodeId(node.id);
     setStepDialogOpen(true);
   }, []);
 
   // Edge click handler for selection
-  const onEdgeClick: EdgeMouseHandler = useCallback((event, edge) => {
-    // Prevent event bubbling to avoid deselecting
-    event.stopPropagation();
-    
-    // Update edge selection state
-    setEdges((eds) =>
-      eds.map((e) => ({
-        ...e,
-        selected: e.id === edge.id,
-      }))
-    );
-    
-    // Clear node selection when edge is selected
-    setNodes((nds) =>
-      nds.map((node) => ({
-        ...node,
-        selected: false,
-      }))
-    );
-  }, [setEdges, setNodes]);
+  const onEdgeClick: EdgeMouseHandler = useCallback(
+    (event, edge) => {
+      // Prevent event bubbling to avoid deselecting
+      event.stopPropagation();
+
+      // Update edge selection state
+      setEdges((eds) =>
+        eds.map((e) => ({
+          ...e,
+          selected: e.id === edge.id,
+        }))
+      );
+
+      // Clear node selection when edge is selected
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: false,
+        }))
+      );
+    },
+    [setEdges, setNodes]
+  );
 
   // Add new step node
   const addStepNode = () => {
@@ -393,6 +588,22 @@ export function WorkflowBuilder({
     setNewStepTools([]);
   };
 
+  // Add new notes node
+  const addNotesNode = () => {
+    const newNode: Node = {
+      id: `notes-${Date.now()}`,
+      type: "notes",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        title: newNotesTitle.trim(),
+        content: newNotesContent.trim(),
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+    setNewNotesTitle("");
+    setNewNotesContent("");
+  };
+
   // Save node edits
   const handleStepSave = (data: any) => {
     setNodes((nds) =>
@@ -403,8 +614,10 @@ export function WorkflowBuilder({
               data: {
                 ...n.data,
                 ...data,
-                toolsData: tools,
-                peopleData: people,
+                // Only add toolsData and peopleData for step nodes
+                ...(n.type === "step"
+                  ? { toolsData: tools, peopleData: people }
+                  : {}),
               },
             }
           : n
@@ -434,11 +647,32 @@ export function WorkflowBuilder({
     }
     setLoading(true);
     try {
-      const flowData: WorkflowData = {
-        nodes,
-        edges,
+      // Convert ReactFlow nodes/edges to WorkflowData format
+      const workflowNodes = nodes.map((node): any => ({
+        id: node.id,
+        type: node.type || "step", // Default to 'step' if undefined
+        position: node.position,
+        data: {
+          label: node.data.action || node.data.title || "Step",
+          ...node.data,
+        },
+      }));
+
+      const workflowEdges = edges.map((edge): any => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        label: typeof edge.label === "string" ? edge.label : undefined,
+        data: edge.data,
+      }));
+
+      const flowData = {
+        nodes: workflowNodes,
+        edges: workflowEdges,
         viewport: { x: 0, y: 0, zoom: 1 },
       };
+
       await onSave({
         name: workflowName.trim(),
         description: workflowDescription.trim(),
@@ -477,8 +711,8 @@ export function WorkflowBuilder({
   return (
     <div className="flex h-[800px] border rounded-lg overflow-hidden">
       {/* Sidebar */}
-      <div className="w-80 border-r bg-gray-50">
-        <div className="p-4 space-y-4">
+      <div className="w-80 border-r bg-gray-50 flex flex-col">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <h3 className="text-lg font-semibold mb-2">Workflow Details</h3>
             <div className="space-y-2">
@@ -590,7 +824,7 @@ export function WorkflowBuilder({
                     }
 
                     // Handle actual people
-                    const person = people.find((p) => p.id === pid);
+                    const person = people.find((p: Person) => p.id === pid);
                     return person ? (
                       <Badge key={pid} className="bg-blue-100 text-blue-800">
                         {person.name}{" "}
@@ -621,8 +855,8 @@ export function WorkflowBuilder({
                   </SelectTrigger>
                   <SelectContent>
                     {tools
-                      .filter((t) => !newStepTools.includes(t.id))
-                      .map((tool) => (
+                      .filter((t: WorkflowTool) => !newStepTools.includes(t.id))
+                      .map((tool: WorkflowTool) => (
                         <SelectItem key={tool.id} value={tool.id}>
                           {tool.name}
                         </SelectItem>
@@ -631,7 +865,7 @@ export function WorkflowBuilder({
                 </Select>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {newStepTools.map((tid) => {
-                    const tool = tools.find((t) => t.id === tid);
+                    const tool = tools.find((t: WorkflowTool) => t.id === tid);
                     return tool ? (
                       <Badge key={tid} className="bg-green-100 text-green-800">
                         {tool.name}{" "}
@@ -652,6 +886,36 @@ export function WorkflowBuilder({
               <Button onClick={addStepNode} className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Step
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Add Notes</h3>
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="notes-title">Title (optional)</Label>
+                <Input
+                  id="notes-title"
+                  value={newNotesTitle}
+                  onChange={(e) => setNewNotesTitle(e.target.value)}
+                  placeholder="e.g. Important reminder, Key points"
+                />
+              </div>
+              <div>
+                <Label htmlFor="notes-content">Content</Label>
+                <RichTextEditor
+                  value={newNotesContent}
+                  onChange={setNewNotesContent}
+                  placeholder="Enter notes content..."
+                  rows={3}
+                />
+              </div>
+              <Button onClick={addNotesNode} className="w-full">
+                <StickyNote className="h-4 w-4 mr-2" />
+                Add Notes
               </Button>
             </div>
           </div>
@@ -695,6 +959,7 @@ export function WorkflowBuilder({
           onEdgesChange={onEdgesChange}
           onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           onEdgeClick={onEdgeClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
@@ -702,13 +967,17 @@ export function WorkflowBuilder({
           nodesDraggable={true}
           nodesConnectable={true}
           elementsSelectable={true}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
           fitView
+          fitViewOptions={{ padding: 0.4 }}
         >
           <Controls />
           <MiniMap />
-          {showGrid && <Background variant="dots" gap={12} size={1} />}
+          {showGrid && (
+            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          )}
         </ReactFlow>
-        <StepEditDialog
+        <NodeEditDialog
           open={stepDialogOpen && !!editingNode}
           onOpenChange={(open: boolean) => {
             setStepDialogOpen(open);
@@ -718,6 +987,7 @@ export function WorkflowBuilder({
           people={people}
           tools={tools}
           nodeData={editingNode?.data}
+          nodeType={editingNode?.type}
         />
       </div>
     </div>
@@ -732,15 +1002,17 @@ export function WorkflowBuilderProvider(props: WorkflowBuilderProps) {
   );
 }
 
-// StepEditDialog component
-function StepEditDialog({
+// NodeEditDialog component - handles both step and notes nodes
+function NodeEditDialog({
   open,
   onOpenChange,
   onSave,
   people,
   tools,
   nodeData,
+  nodeType,
 }: any) {
+  // Step node fields
   const [action, setAction] = useState(nodeData?.action || "");
   const [description, setDescription] = useState(nodeData?.description || "");
   const [selectedPeople, setSelectedPeople] = useState<string[]>(
@@ -751,16 +1023,28 @@ function StepEditDialog({
   );
   const [links, setLinks] = useState<any[]>(nodeData?.links || []);
 
+  // Notes node fields
+  const [notesTitle, setNotesTitle] = useState(nodeData?.title || "");
+  const [notesContent, setNotesContent] = useState(nodeData?.content || "");
+
   useEffect(() => {
-    setAction(nodeData?.action || "");
-    setDescription(nodeData?.description || "");
-    setSelectedPeople(nodeData?.people || []);
-    setSelectedTools(nodeData?.tools || []);
-    setLinks(nodeData?.links || []);
-  }, [nodeData, open]);
+    if (nodeType === "step") {
+      setAction(nodeData?.action || "");
+      setDescription(nodeData?.description || "");
+      setSelectedPeople(nodeData?.people || []);
+      setSelectedTools(nodeData?.tools || []);
+      setLinks(nodeData?.links || []);
+    } else if (nodeType === "notes") {
+      setNotesTitle(nodeData?.title || "");
+      setNotesContent(nodeData?.content || "");
+    }
+  }, [nodeData, nodeType, open]);
 
   const handleAddLink = () => {
-    setLinks([...links, { id: Date.now().toString(), url: "", description: "" }]);
+    setLinks([
+      ...links,
+      { id: Date.now().toString(), url: "", description: "" },
+    ]);
   };
 
   const handleRemoveLink = (index: number) => {
@@ -768,7 +1052,9 @@ function StepEditDialog({
   };
 
   const handleLinkChange = (index: number, field: string, value: string) => {
-    setLinks(links.map((link, i) => (i === index ? { ...link, [field]: value } : link)));
+    setLinks(
+      links.map((link, i) => (i === index ? { ...link, [field]: value } : link))
+    );
   };
 
   return (
@@ -781,168 +1067,226 @@ function StepEditDialog({
       aria-labelledby="edit-step-dialog-title"
     >
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h3 id="edit-step-dialog-title" className="text-lg font-semibold mb-2">Edit Step</h3>
+        <h3 id="edit-step-dialog-title" className="text-lg font-semibold mb-2">
+          {nodeType === "notes" ? "Edit Notes" : "Edit Step"}
+        </h3>
         <div className="space-y-3">
-          <div>
-            <Label>Action</Label>
-            <Input
-              value={action}
-              onChange={(e) => setAction(e.target.value)}
-              placeholder="e.g. Send email, Issue invoice"
-            />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Step details (optional)"
-              rows={2}
-            />
-          </div>
-          <div>
-            <Label>People</Label>
-            <Select
-              value={""}
-              onValueChange={(val) =>
-                setSelectedPeople([...selectedPeople, val])
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Add people" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="user">User (Generic)</SelectItem>
-                <SelectItem value="customer">Customer (Generic)</SelectItem>
-                {people
-                  .filter((p) => !selectedPeople.includes(p.id))
-                  .map((person) => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {selectedPeople.map((pid) => {
-                // Handle generic "User" option
-                if (pid === "user") {
-                  return (
-                    <Badge key={pid} className="bg-blue-100 text-blue-800">
-                      User{" "}
-                      <button
-                        onClick={() =>
-                          setSelectedPeople(
-                            selectedPeople.filter((id) => id !== pid)
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  );
-                }
-
-                // Handle generic "Customer" option
-                if (pid === "customer") {
-                  return (
-                    <Badge key={pid} className="bg-blue-100 text-blue-800">
-                      Customer{" "}
-                      <button
-                        onClick={() =>
-                          setSelectedPeople(
-                            selectedPeople.filter((id) => id !== pid)
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  );
-                }
-
-                // Handle actual people
-                const person = people.find((p) => p.id === pid);
-                return person ? (
-                  <Badge key={pid} className="bg-blue-100 text-blue-800">
-                    {person.name}{" "}
-                    <button
-                      onClick={() =>
-                        setSelectedPeople(
-                          selectedPeople.filter((id) => id !== pid)
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ) : null;
-              })}
-            </div>
-          </div>
-          <div>
-            <Label>Tools</Label>
-            <Select
-              value={""}
-              onValueChange={(val) => setSelectedTools([...selectedTools, val])}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Add tools" />
-              </SelectTrigger>
-              <SelectContent>
-                {tools
-                  .filter((t) => !selectedTools.includes(t.id))
-                  .map((tool) => (
-                    <SelectItem key={tool.id} value={tool.id}>
-                      {tool.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {selectedTools.map((tid) => {
-                const tool = tools.find((t) => t.id === tid);
-                return tool ? (
-                  <Badge key={tid} className="bg-green-100 text-green-800">
-                    {tool.name}{" "}
-                    <button
-                      onClick={() =>
-                        setSelectedTools(
-                          selectedTools.filter((id) => id !== tid)
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ) : null;
-              })}
-            </div>
-          </div>
-          <div>
-            <Label>Links</Label>
-            {links.map((link, index) => (
-              <div key={index} className="flex items-center gap-2">
+          {nodeType === "notes" ? (
+            // Notes node fields
+            <>
+              <div>
+                <Label>Title (optional)</Label>
                 <Input
-                  value={link.url}
-                  onChange={(e) => handleLinkChange(index, "url", e.target.value)}
-                  placeholder="Enter link URL"
+                  value={notesTitle}
+                  onChange={(e) => setNotesTitle(e.target.value)}
+                  placeholder="e.g. Important reminder, Key points"
                 />
-                <Input
-                  value={link.description}
-                  onChange={(e) => handleLinkChange(index, "description", e.target.value)}
-                  placeholder="Enter link description"
-                />
-                <button onClick={() => handleRemoveLink(index)}>
-                  <X className="h-4 w-4 text-red-600" />
-                </button>
               </div>
-            ))}
-            <Button onClick={handleAddLink} variant="outline" className="w-full">
-              <Link className="h-4 w-4 mr-2" />
-              Add Link
-            </Button>
-          </div>
+              <div>
+                <Label>Content</Label>
+                <RichTextEditor
+                  value={notesContent}
+                  onChange={setNotesContent}
+                  placeholder="Enter notes content..."
+                  rows={4}
+                />
+              </div>
+            </>
+          ) : (
+            // Step node fields
+            <>
+              <div>
+                <Label>Action</Label>
+                <Input
+                  value={action}
+                  onChange={(e) => setAction(e.target.value)}
+                  placeholder="e.g. Send email, Issue invoice"
+                />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Step details (optional)"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <Label>People</Label>
+                <Select
+                  value={""}
+                  onValueChange={(val) =>
+                    setSelectedPeople([...selectedPeople, val])
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add people" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User (Generic)</SelectItem>
+                    <SelectItem value="customer">Customer (Generic)</SelectItem>
+                    {people
+                      .filter((p: Person) => !selectedPeople.includes(p.id))
+                      .map((person: Person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {person.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedPeople.map((pid) => {
+                    // Handle generic "User" option
+                    if (pid === "user") {
+                      return (
+                        <Badge key={pid} className="bg-blue-100 text-blue-800">
+                          User{" "}
+                          <button
+                            onClick={() =>
+                              setSelectedPeople(
+                                selectedPeople.filter((id) => id !== pid)
+                              )
+                            }
+                            aria-label="Remove user"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      );
+                    }
+
+                    // Handle generic "Customer" option
+                    if (pid === "customer") {
+                      return (
+                        <Badge key={pid} className="bg-blue-100 text-blue-800">
+                          Customer{" "}
+                          <button
+                            onClick={() =>
+                              setSelectedPeople(
+                                selectedPeople.filter((id) => id !== pid)
+                              )
+                            }
+                            aria-label="Remove customer"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      );
+                    }
+
+                    // Handle actual people
+                    const person = people.find((p: Person) => p.id === pid);
+                    return person ? (
+                      <Badge key={pid} className="bg-blue-100 text-blue-800">
+                        <div className="flex items-center gap-1">
+                          <span>{person.name}</span>
+                          {getOrganizationLogo(person.organisation) && (
+                            <Image
+                              src={getOrganizationLogo(person.organisation)}
+                              alt={`${person.organisation} logo`}
+                              width={12}
+                              height={12}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                        </div>{" "}
+                        <button
+                          onClick={() =>
+                            setSelectedPeople(
+                              selectedPeople.filter((id) => id !== pid)
+                            )
+                          }
+                          title="Remove person"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label>Tools</Label>
+                <Select
+                  value={""}
+                  onValueChange={(val) =>
+                    setSelectedTools([...selectedTools, val])
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add tools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tools
+                      .filter(
+                        (t: WorkflowTool) => !selectedTools.includes(t.id)
+                      )
+                      .map((tool: WorkflowTool) => (
+                        <SelectItem key={tool.id} value={tool.id}>
+                          {tool.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedTools.map((tid) => {
+                    const tool = tools.find((t: WorkflowTool) => t.id === tid);
+                    return tool ? (
+                      <Badge key={tid} className="bg-green-100 text-green-800">
+                        {tool.name}{" "}
+                        <button
+                          onClick={() =>
+                            setSelectedTools(
+                              selectedTools.filter((id) => id !== tid)
+                            )
+                          }
+                          aria-label="Remove tool"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              <div>
+                <Label>Links</Label>
+                {links.map((link, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={link.url}
+                      onChange={(e) =>
+                        handleLinkChange(index, "url", e.target.value)
+                      }
+                      placeholder="Enter link URL"
+                    />
+                    <Input
+                      value={link.description}
+                      onChange={(e) =>
+                        handleLinkChange(index, "description", e.target.value)
+                      }
+                      placeholder="Enter link description"
+                    />
+                    <button
+                      onClick={() => handleRemoveLink(index)}
+                      aria-label="Remove link"
+                    >
+                      <X className="h-4 w-4 text-red-600" />
+                    </button>
+                  </div>
+                ))}
+                <Button
+                  onClick={handleAddLink}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  Add Link
+                </Button>
+              </div>
+            </>
+          )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -950,13 +1294,20 @@ function StepEditDialog({
           </Button>
           <Button
             onClick={() => {
-              onSave({
-                action,
-                description,
-                people: selectedPeople,
-                tools: selectedTools,
-                links,
-              });
+              if (nodeType === "notes") {
+                onSave({
+                  title: notesTitle,
+                  content: notesContent,
+                });
+              } else {
+                onSave({
+                  action,
+                  description,
+                  people: selectedPeople,
+                  tools: selectedTools,
+                  links,
+                });
+              }
               onOpenChange(false);
             }}
           >

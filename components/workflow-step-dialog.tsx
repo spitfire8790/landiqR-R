@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,41 +9,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import type { Person } from "@/lib/types"
+} from "@/components/ui/select";
+import type { Person } from "@/lib/types";
+import { getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 
 // Define WorkflowStep interface locally since it's not exported from lib/types
 interface WorkflowStep {
-  id: string
-  name: string
-  description: string
-  order: number
-  status: "pending" | "in_progress" | "completed" | "blocked"
-  responsiblePersonId?: string
-  estimatedHours?: number
-  actualHours?: number
-  createdAt: string
-  taskId: string
+  id: string;
+  name: string;
+  description: string;
+  order: number;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  responsiblePersonId?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  createdAt: string;
+  taskId: string;
 }
 
 interface WorkflowStepDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (step: Omit<WorkflowStep, "id" | "createdAt">) => void
-  availablePeople: Person[]
-  taskId: string
-  step?: WorkflowStep
-  nextOrder: number
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (step: Omit<WorkflowStep, "id" | "createdAt">) => void;
+  availablePeople: Person[];
+  taskId: string;
+  step?: WorkflowStep;
+  nextOrder: number;
 }
 
 export function WorkflowStepDialog({
@@ -55,36 +57,38 @@ export function WorkflowStepDialog({
   step,
   nextOrder,
 }: WorkflowStepDialogProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [order, setOrder] = useState(nextOrder)
-  const [status, setStatus] = useState<WorkflowStep["status"]>("pending")
-  const [responsiblePersonId, setResponsiblePersonId] = useState<string>("")
-  const [estimatedHours, setEstimatedHours] = useState<number | undefined>(undefined)
-  const [actualHours, setActualHours] = useState<number | undefined>(undefined)
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [order, setOrder] = useState(nextOrder);
+  const [status, setStatus] = useState<WorkflowStep["status"]>("pending");
+  const [responsiblePersonId, setResponsiblePersonId] = useState<string>("");
+  const [estimatedHours, setEstimatedHours] = useState<number | undefined>(
+    undefined
+  );
+  const [actualHours, setActualHours] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (step) {
-      setName(step.name)
-      setDescription(step.description)
-      setOrder(step.order)
-      setStatus(step.status)
-      setResponsiblePersonId(step.responsiblePersonId || "")
-      setEstimatedHours(step.estimatedHours)
-      setActualHours(step.actualHours)
+      setName(step.name);
+      setDescription(step.description);
+      setOrder(step.order);
+      setStatus(step.status);
+      setResponsiblePersonId(step.responsiblePersonId || "");
+      setEstimatedHours(step.estimatedHours);
+      setActualHours(step.actualHours);
     } else {
-      setName("")
-      setDescription("")
-      setOrder(nextOrder)
-      setStatus("pending")
-      setResponsiblePersonId("")
-      setEstimatedHours(undefined)
-      setActualHours(undefined)
+      setName("");
+      setDescription("");
+      setOrder(nextOrder);
+      setStatus("pending");
+      setResponsiblePersonId("");
+      setEstimatedHours(undefined);
+      setActualHours(undefined);
     }
-  }, [step, nextOrder, open])
+  }, [step, nextOrder, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (name.trim()) {
       onSave({
         name: name.trim(),
@@ -95,36 +99,37 @@ export function WorkflowStepDialog({
         responsiblePersonId: responsiblePersonId || undefined,
         estimatedHours,
         actualHours,
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   const statusOptions = [
     { value: "pending", label: "Pending" },
     { value: "in_progress", label: "In Progress" },
     { value: "completed", label: "Completed" },
-  ]
+  ];
 
   const getStatusColor = (status: WorkflowStep["status"]) => {
     switch (status) {
-      case "completed": return "text-green-600"
-      case "in_progress": return "text-blue-600"
-      case "pending": return "text-gray-600"
-      default: return "text-gray-600"
+      case "completed":
+        return "text-green-600";
+      case "in_progress":
+        return "text-blue-600";
+      case "pending":
+        return "text-gray-600";
+      default:
+        return "text-gray-600";
     }
-  }
+  };
 
   return (
-    <Dialog 
-      open={open} 
-      onOpenChange={onOpenChange}
-    >
-      <DialogContent 
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         className="sm:max-w-[500px]"
         onEscapeKeyDown={(event: KeyboardEvent) => {
           // Only allow plain Escape (no modifiers) to close the dialog
@@ -134,9 +139,13 @@ export function WorkflowStepDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{step ? "Edit Workflow Step" : "Add New Workflow Step"}</DialogTitle>
+          <DialogTitle>
+            {step ? "Edit Workflow Step" : "Add New Workflow Step"}
+          </DialogTitle>
           <DialogDescription>
-            {step ? "Update the workflow step details." : "Create a new step in the workflow."}
+            {step
+              ? "Update the workflow step details."
+              : "Create a new step in the workflow."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -154,7 +163,7 @@ export function WorkflowStepDialog({
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="description" className="text-right pt-2">
                 Description
@@ -188,14 +197,23 @@ export function WorkflowStepDialog({
               <Label htmlFor="status" className="text-right">
                 Status
               </Label>
-              <Select value={status} onValueChange={(value: WorkflowStep["status"]) => setStatus(value)}>
+              <Select
+                value={status}
+                onValueChange={(value: WorkflowStep["status"]) =>
+                  setStatus(value)
+                }
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {statusOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <span className={getStatusColor(option.value as WorkflowStep["status"])}>
+                      <span
+                        className={getStatusColor(
+                          option.value as WorkflowStep["status"]
+                        )}
+                      >
                         {option.label}
                       </span>
                     </SelectItem>
@@ -208,17 +226,35 @@ export function WorkflowStepDialog({
               <Label htmlFor="responsible" className="text-right">
                 Responsible Person
               </Label>
-              <Select value={responsiblePersonId} onValueChange={setResponsiblePersonId}>
+              <Select
+                value={responsiblePersonId}
+                onValueChange={setResponsiblePersonId}
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select responsible person (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No one assigned</SelectItem>
-                  {availablePeople.sort((a, b) => a.name.localeCompare(b.name)).map((person) => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name} - {person.organisation}
-                    </SelectItem>
-                  ))}
+                  {availablePeople
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        <div className="flex items-center gap-2">
+                          <span>
+                            {person.name} - {person.organisation}
+                          </span>
+                          {getOrganizationLogo(person.organisation) && (
+                            <Image
+                              src={getOrganizationLogo(person.organisation)}
+                              alt={`${person.organisation} logo`}
+                              width={16}
+                              height={16}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -231,7 +267,11 @@ export function WorkflowStepDialog({
                 id="estimatedHours"
                 type="number"
                 value={estimatedHours || ""}
-                onChange={(e) => setEstimatedHours(e.target.value ? parseFloat(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setEstimatedHours(
+                    e.target.value ? parseFloat(e.target.value) : undefined
+                  )
+                }
                 className="col-span-3"
                 placeholder="Enter estimated hours"
                 min={0}
@@ -247,7 +287,11 @@ export function WorkflowStepDialog({
                 id="actualHours"
                 type="number"
                 value={actualHours || ""}
-                onChange={(e) => setActualHours(e.target.value ? parseFloat(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setActualHours(
+                    e.target.value ? parseFloat(e.target.value) : undefined
+                  )
+                }
                 className="col-span-3"
                 placeholder="Enter actual hours"
                 min={0}
@@ -266,5 +310,5 @@ export function WorkflowStepDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

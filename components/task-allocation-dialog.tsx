@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,26 +9,28 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import type { TaskAllocation, Person } from "@/lib/types"
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import type { TaskAllocation, Person } from "@/lib/types";
+import { getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 
 interface TaskAllocationDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (allocation: Omit<TaskAllocation, "id" | "createdAt">) => void
-  availablePeople: Person[]
-  taskId: string
-  allocation?: TaskAllocation
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (allocation: Omit<TaskAllocation, "id" | "createdAt">) => void;
+  availablePeople: Person[];
+  taskId: string;
+  allocation?: TaskAllocation;
 }
 
 export default function TaskAllocationDialog({
@@ -39,48 +41,52 @@ export default function TaskAllocationDialog({
   taskId,
   allocation,
 }: TaskAllocationDialogProps) {
-  const [personId, setPersonId] = useState("")
-  const [isLead, setIsLead] = useState(false)
-  const [estimatedWeeklyHours, setEstimatedWeeklyHours] = useState(0)
+  const [personId, setPersonId] = useState("");
+  const [isLead, setIsLead] = useState(false);
+  const [estimatedWeeklyHours, setEstimatedWeeklyHours] = useState(0);
 
   useEffect(() => {
     if (allocation) {
-      setPersonId(allocation.personId)
-      setIsLead(allocation.isLead || false)
-      setEstimatedWeeklyHours(allocation.estimatedWeeklyHours)
+      setPersonId(allocation.personId);
+      setIsLead(allocation.isLead || false);
+      setEstimatedWeeklyHours(allocation.estimatedWeeklyHours);
     } else {
-      setPersonId("")
-      setIsLead(false)
-      setEstimatedWeeklyHours(0)
+      setPersonId("");
+      setIsLead(false);
+      setEstimatedWeeklyHours(0);
     }
-  }, [allocation, open])
+  }, [allocation, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (personId) {
       onSave({
         taskId,
         personId,
         isLead,
         estimatedWeeklyHours,
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
-  const selectedPerson = availablePeople.find(p => p.id === personId)
+  const selectedPerson = availablePeople.find((p) => p.id === personId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{allocation ? "Edit Task Allocation" : "Allocate Person to Task"}</DialogTitle>
+          <DialogTitle>
+            {allocation ? "Edit Task Allocation" : "Allocate Person to Task"}
+          </DialogTitle>
           <DialogDescription>
-            {allocation ? "Update the task allocation details." : "Assign a person to work on this task."}
+            {allocation
+              ? "Update the task allocation details."
+              : "Assign a person to work on this task."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -94,14 +100,29 @@ export default function TaskAllocationDialog({
                   <SelectValue placeholder="Select a person" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availablePeople.sort((a, b) => a.name.localeCompare(b.name)).map((person) => (
-                    <SelectItem key={person.id} value={person.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{person.name}</span>
-                        <span className="text-sm text-gray-500">{person.organisation}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {availablePeople
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{person.name}</span>
+                            <span className="text-sm text-gray-500">
+                              {person.organisation}
+                            </span>
+                          </div>
+                          {getOrganizationLogo(person.organisation) && (
+                            <Image
+                              src={getOrganizationLogo(person.organisation)}
+                              alt={`${person.organisation} logo`}
+                              width={16}
+                              height={16}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -110,8 +131,12 @@ export default function TaskAllocationDialog({
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Details</Label>
                 <div className="col-span-3 text-sm text-gray-600">
-                  <div><strong>Email:</strong> {selectedPerson.email}</div>
-                  <div><strong>Role:</strong> {selectedPerson.role}</div>
+                  <div>
+                    <strong>Email:</strong> {selectedPerson.email}
+                  </div>
+                  <div>
+                    <strong>Role:</strong> {selectedPerson.role}
+                  </div>
                 </div>
               </div>
             )}
@@ -126,7 +151,9 @@ export default function TaskAllocationDialog({
                 min="0"
                 step="0.5"
                 value={estimatedWeeklyHours}
-                onChange={(e) => setEstimatedWeeklyHours(Number(e.target.value))}
+                onChange={(e) =>
+                  setEstimatedWeeklyHours(Number(e.target.value))
+                }
                 className="col-span-3"
                 placeholder="Estimated weekly hours"
               />
@@ -159,5 +186,5 @@ export default function TaskAllocationDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

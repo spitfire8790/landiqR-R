@@ -21,7 +21,8 @@ import type {
   Task,
   TaskAllocation,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
@@ -237,13 +238,19 @@ export default function OrgChart({
   onAddAllocation,
   onCategoryClick,
 }: OrgChartProps) {
-  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(
+    null
+  );
   const [highlightedOrg, setHighlightedOrg] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [selectedCategoryForTasks, setSelectedCategoryForTasks] = useState<string | null>(null);
+  const [selectedCategoryForTasks, setSelectedCategoryForTasks] = useState<
+    string | null
+  >(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskAllocations, setTaskAllocations] = useState<TaskAllocation[]>([]);
-  const [allTasksData, setAllTasksData] = useState<{ [categoryId: string]: { tasks: Task[], allocations: TaskAllocation[] } }>({});
+  const [allTasksData, setAllTasksData] = useState<{
+    [categoryId: string]: { tasks: Task[]; allocations: TaskAllocation[] };
+  }>({});
 
   // State for drag and drop ordering
   const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
@@ -515,7 +522,10 @@ export default function OrgChart({
     if (categories.length === 0) return;
 
     try {
-      const tasksData: Record<string, { tasks: Task[], allocations: TaskAllocation[] }> = {};
+      const tasksData: Record<
+        string,
+        { tasks: Task[]; allocations: TaskAllocation[] }
+      > = {};
 
       // Load tasks for each category
       for (const category of categories) {
@@ -552,7 +562,7 @@ export default function OrgChart({
   // Get person name for task allocations
   const getPersonNameForTask = (personId: string) => {
     const person = people.find((p) => p.id === personId);
-    return person ? getFirstName(person.name) : "Unknown";
+    return person ? person.name : "Unknown";
   };
 
   // Get category name
@@ -612,6 +622,7 @@ export default function OrgChart({
               value={selectedPersonId || ""}
               onChange={(e) => setSelectedPersonId(e.target.value || null)}
               className="flex-1 sm:flex-none px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-cyan-400 dark:focus:ring-cyan-400"
+              aria-label="Filter by person"
             >
               <option value="">All People</option>
               {[...people]
@@ -710,155 +721,236 @@ export default function OrgChart({
                     <div className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pb-4 mb-4">
                       <div className="flex gap-4 flex-wrap">
                         {orderedGroups.map((group) => {
-                          const groupCategories = getCategoriesForGroup(group.id);
+                          const groupCategories = getCategoriesForGroup(
+                            group.id
+                          );
                           if (groupCategories.length === 0) return null;
 
                           return (
                             <div key={group.id} className="flex-shrink-0 mb-4">
                               {/* Group Header */}
-                              <div className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 p-3 rounded-t-lg shadow-lg border border-slate-500 min-w-[200px]">
+                              <div
+                                className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 p-3 rounded-t-lg shadow-lg border border-slate-500"
+                                style={{
+                                  width: `${groupCategories.length * 200}px`,
+                                }}
+                              >
                                 <div className="flex items-center justify-center gap-2 text-white drop-shadow-sm font-bold">
                                   {React.createElement(
                                     resolveGroupIcon(group.icon),
                                     { className: "h-4 w-4" }
                                   )}
-                                  <span className="text-sm">
-                                    {group.name}
-                                  </span>
+                                  <span className="text-sm">{group.name}</span>
                                 </div>
                               </div>
-                              
+
                               {/* Categories under this group */}
                               <div className="flex">
                                 {groupCategories.map((category, index) => (
-                                  <div 
-                                    key={category.id} 
+                                  <div
+                                    key={category.id}
                                     className={cn(
-                                      "border-l border-r border-b border-slate-300 dark:border-slate-600 min-w-[150px] bg-white dark:bg-gray-800",
+                                      "border-l border-r border-b border-slate-300 dark:border-slate-600 w-[200px] bg-white dark:bg-gray-800",
                                       index === 0 && "rounded-bl-lg",
-                                      index === groupCategories.length - 1 && "rounded-br-lg"
+                                      index === groupCategories.length - 1 &&
+                                        "rounded-br-lg"
                                     )}
                                   >
                                     <div
                                       className={cn(
-                                        "p-2 cursor-pointer transition-all duration-200 text-center border-b border-slate-200 dark:border-slate-600",
+                                        "p-2 cursor-pointer transition-all duration-200 text-center border-b border-slate-200 dark:border-slate-600 h-16 flex items-center justify-center",
                                         highlightedCategory === category.id
                                           ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white"
                                           : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                                       )}
                                       onClick={() => {
                                         setHighlightedCategory(
-                                          highlightedCategory === category.id ? null : category.id
+                                          highlightedCategory === category.id
+                                            ? null
+                                            : category.id
                                         );
                                         if (onCategoryClick) {
                                           onCategoryClick(category.id);
                                         }
                                       }}
                                     >
-                                      <span className="text-xs font-medium">
+                                      <span className="text-xs font-medium leading-tight px-1 overflow-hidden text-ellipsis">
                                         {category.name}
                                       </span>
                                     </div>
-                                    
+
                                     {/* People allocated to this category */}
                                     <div className="p-3 min-h-[200px]">
                                       {(() => {
                                         // Get all allocations for this category (from all organizations)
-                                        const allOrgs = ['PDNSW', 'WSP', 'Giraffe'];
+                                        const allOrgs = [
+                                          "PDNSW",
+                                          "WSP",
+                                          "Giraffe",
+                                        ];
                                         const allAllocations: any[] = [];
-                                        
-                                        allOrgs.forEach(org => {
-                                          const directAllocations = getAllocationsForCategoryAndOrg(category.id, org);
-                                          const taskAllocations = getPeopleFromTaskAllocations(category.id, org);
-                                          
+
+                                        allOrgs.forEach((org) => {
+                                          const directAllocations =
+                                            getAllocationsForCategoryAndOrg(
+                                              category.id,
+                                              org
+                                            );
+                                          const taskAllocations =
+                                            getPeopleFromTaskAllocations(
+                                              category.id,
+                                              org
+                                            );
+
                                           // Add direct allocations
-                                          directAllocations.forEach(alloc => {
-                                            if (!allAllocations.some(existing => existing.id === alloc.id)) {
+                                          directAllocations.forEach((alloc) => {
+                                            if (
+                                              !allAllocations.some(
+                                                (existing) =>
+                                                  existing.id === alloc.id
+                                              )
+                                            ) {
                                               allAllocations.push(alloc);
                                             }
                                           });
-                                          
+
                                           // Add task allocations (avoiding duplicates)
-                                          taskAllocations.forEach(taskAlloc => {
-                                            if (!allAllocations.some(existing => existing.personId === taskAlloc.personId)) {
-                                              allAllocations.push(taskAlloc);
+                                          taskAllocations.forEach(
+                                            (taskAlloc) => {
+                                              if (
+                                                !allAllocations.some(
+                                                  (existing) =>
+                                                    existing.personId ===
+                                                    taskAlloc.personId
+                                                )
+                                              ) {
+                                                allAllocations.push(taskAlloc);
+                                              }
                                             }
-                                          });
+                                          );
                                         });
 
                                         if (allAllocations.length > 0) {
                                           return (
                                             <div className="space-y-2">
-                                              {allAllocations.map((allocation) => {
-                                                const person = people.find((p) => p.id === allocation.personId);
-                                                if (!person) return null;
+                                              {allAllocations.map(
+                                                (allocation) => {
+                                                  const person = people.find(
+                                                    (p) =>
+                                                      p.id ===
+                                                      allocation.personId
+                                                  );
+                                                  if (!person) return null;
 
-                                                // Get organization color
-                                                const getPersonOrgColor = (org: string) => {
-                                                  switch (org) {
-                                                    case 'PDNSW':
-                                                      return 'text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700';
-                                                    case 'WSP':
-                                                      return 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700';
-                                                    case 'Giraffe':
-                                                      return 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700';
-                                                    default:
-                                                      return 'text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600';
-                                                  }
-                                                };
+                                                  // Get organization color
+                                                  const getPersonOrgColor = (
+                                                    org: string
+                                                  ) => {
+                                                    switch (org) {
+                                                      case "PDNSW":
+                                                        return "text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700";
+                                                      case "WSP":
+                                                        return "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700";
+                                                      case "Giraffe":
+                                                        return "text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700";
+                                                      default:
+                                                        return "text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600";
+                                                    }
+                                                  };
 
-                                                return (
-                                                  <motion.div
-                                                    key={allocation.id}
-                                                    className={cn(
-                                                      "flex items-center justify-between gap-2 p-2 rounded text-xs group border",
-                                                      getPersonOrgColor(person.organisation)
-                                                    )}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                  >
-                                                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                                                      <User className="h-3 w-3 flex-shrink-0" />
-                                                      <span className="font-medium truncate">
-                                                        {getFirstName(person.name)}
-                                                      </span>
-                                                      {allocation.isLead && (
-                                                        <Star className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                                      )}
-                                                    </div>
+                                                  return (
                                                     <motion.div
-                                                      whileHover={{ scale: 1.1 }}
-                                                      whileTap={{ scale: 0.9 }}
+                                                      key={allocation.id}
+                                                      className={cn(
+                                                        "flex items-center justify-between gap-2 p-2 rounded text-xs group border",
+                                                        getPersonOrgColor(
+                                                          person.organisation
+                                                        )
+                                                      )}
+                                                      initial={{
+                                                        opacity: 0,
+                                                        y: 10,
+                                                      }}
+                                                      animate={{
+                                                        opacity: 1,
+                                                        y: 0,
+                                                      }}
+                                                      exit={{
+                                                        opacity: 0,
+                                                        y: -10,
+                                                      }}
                                                     >
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => onDeleteAllocation(allocation.id)}
-                                                        className="h-5 w-5 hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                      <div className="flex items-center gap-1 min-w-0 flex-1">
+                                                        <User className="h-3 w-3 flex-shrink-0" />
+                                                        <span className="font-medium truncate">
+                                                          {person.name}
+                                                        </span>
+                                                        {getOrganizationLogo(
+                                                          person.organisation
+                                                        ) && (
+                                                          <Image
+                                                            src={getOrganizationLogo(
+                                                              person.organisation
+                                                            )}
+                                                            alt={`${person.organisation} logo`}
+                                                            width={12}
+                                                            height={12}
+                                                            className="flex-shrink-0"
+                                                          />
+                                                        )}
+                                                        {allocation.isLead && (
+                                                          <Star className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                                        )}
+                                                      </div>
+                                                      <motion.div
+                                                        whileHover={{
+                                                          scale: 1.1,
+                                                        }}
+                                                        whileTap={{
+                                                          scale: 0.9,
+                                                        }}
                                                       >
-                                                        <X className="h-3 w-3" />
-                                                        <span className="sr-only">Remove</span>
-                                                      </Button>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="icon"
+                                                          onClick={() =>
+                                                            onDeleteAllocation(
+                                                              allocation.id
+                                                            )
+                                                          }
+                                                          className="h-5 w-5 hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                          <X className="h-3 w-3" />
+                                                          <span className="sr-only">
+                                                            Remove
+                                                          </span>
+                                                        </Button>
+                                                      </motion.div>
                                                     </motion.div>
-                                                  </motion.div>
-                                                );
-                                              })}
+                                                  );
+                                                }
+                                              )}
                                             </div>
                                           );
                                         } else {
                                           return (
-                                            <div 
+                                            <div
                                               className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                               onClick={(e) => {
-                                                handleCategoryClickForTasks(category.id);
+                                                handleCategoryClickForTasks(
+                                                  category.id
+                                                );
                                                 onAddAllocation();
                                               }}
                                             >
                                               <div className="text-center">
                                                 <User className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                                                <span className="text-xs">No allocations</span>
-                                                <div className="text-xs text-gray-300 dark:text-gray-600 mt-1">Click to add</div>
+                                                <span className="text-xs">
+                                                  No allocations
+                                                </span>
+                                                <div className="text-xs text-gray-300 dark:text-gray-600 mt-1">
+                                                  Click to add
+                                                </div>
                                               </div>
                                             </div>
                                           );

@@ -51,7 +51,8 @@ import {
   createTaskSourceLink,
 } from "@/lib/data-service";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 import {
   PlusCircle,
   Calendar,
@@ -598,14 +599,16 @@ export default function TasksView({
                                 <span>{totalWeeklyHours}h total estimated</span>
                               </div>
                             )}
-                            {task.sourceLinks && task.sourceLinks.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <ExternalLink className="h-4 w-4" />
-                                <span className="text-sm text-gray-600">
-                                  {task.sourceLinks.length} source{task.sourceLinks.length > 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            )}
+                            {task.sourceLinks &&
+                              task.sourceLinks.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <ExternalLink className="h-4 w-4" />
+                                  <span className="text-sm text-gray-600">
+                                    {task.sourceLinks.length} source
+                                    {task.sourceLinks.length > 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                              )}
                           </div>
                         </div>
 
@@ -653,7 +656,9 @@ export default function TasksView({
                       {/* Task Allocations */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">Task Allocations</h4>
+                          <h4 className="text-sm font-medium">
+                            Task Allocations
+                          </h4>
                           {selectedCategoryId &&
                             selectedCategoryId !== "all" &&
                             isAdmin && (
@@ -683,8 +688,30 @@ export default function TasksView({
                                   <span className="text-sm">
                                     {getPersonName(allocation.personId)}
                                   </span>
+                                  {(() => {
+                                    const person = people.find(
+                                      (p) => p.id === allocation.personId
+                                    );
+                                    return person &&
+                                      getOrganizationLogo(
+                                        person.organisation
+                                      ) ? (
+                                      <Image
+                                        src={getOrganizationLogo(
+                                          person.organisation
+                                        )}
+                                        alt={`${person.organisation} logo`}
+                                        width={12}
+                                        height={12}
+                                        className="flex-shrink-0"
+                                      />
+                                    ) : null;
+                                  })()}
                                   {allocation.isLead && (
-                                    <Badge variant="secondary" className="text-xs">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
                                       Lead
                                     </Badge>
                                   )}
@@ -727,7 +754,9 @@ export default function TasksView({
                       {task.sourceLinks && task.sourceLinks.length > 0 && (
                         <>
                           <div className="space-y-3">
-                            <h4 className="text-sm font-medium">Source Links</h4>
+                            <h4 className="text-sm font-medium">
+                              Source Links
+                            </h4>
                             <div className="space-y-2">
                               {task.sourceLinks.map((link) => (
                                 <div
@@ -737,7 +766,9 @@ export default function TasksView({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => window.open(link.url, '_blank')}
+                                    onClick={() =>
+                                      window.open(link.url, "_blank")
+                                    }
                                     className="h-auto p-0 text-blue-600 hover:text-blue-800"
                                   >
                                     <ExternalLink className="h-4 w-4 mr-1" />
@@ -769,7 +800,9 @@ export default function TasksView({
                       {/* Responsibilities */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">Responsibilities</h4>
+                          <h4 className="text-sm font-medium">
+                            Responsibilities
+                          </h4>
                           {selectedCategoryId &&
                             selectedCategoryId !== "all" &&
                             isAdmin && (
@@ -804,11 +837,34 @@ export default function TasksView({
                                       </p>
                                       <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                                         {responsibility.assignedPersonId && (
-                                          <span>
-                                            Assigned:{" "}
-                                            {getPersonName(
-                                              responsibility.assignedPersonId
-                                            )}
+                                          <span className="flex items-center gap-1">
+                                            <span>
+                                              Assigned:{" "}
+                                              {getPersonName(
+                                                responsibility.assignedPersonId
+                                              )}
+                                            </span>
+                                            {(() => {
+                                              const person = people.find(
+                                                (p) =>
+                                                  p.id ===
+                                                  responsibility.assignedPersonId
+                                              );
+                                              return person &&
+                                                getOrganizationLogo(
+                                                  person.organisation
+                                                ) ? (
+                                                <Image
+                                                  src={getOrganizationLogo(
+                                                    person.organisation
+                                                  )}
+                                                  alt={`${person.organisation} logo`}
+                                                  width={10}
+                                                  height={10}
+                                                  className="flex-shrink-0"
+                                                />
+                                              ) : null;
+                                            })()}
                                           </span>
                                         )}
                                         {responsibility.estimatedWeeklyHours >

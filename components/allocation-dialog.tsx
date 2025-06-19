@@ -1,73 +1,101 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import type { Person, Category, Allocation } from "@/lib/types"
-import { motion } from "framer-motion"
+import { useState, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Person, Category, Allocation } from "@/lib/types";
+import { motion } from "framer-motion";
+import { getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 
 interface AllocationDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (allocation: Allocation) => void
-  categories: Category[]
-  people: Person[]
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (allocation: Allocation) => void;
+  categories: Category[];
+  people: Person[];
 }
 
-export function AllocationDialog({ open, onOpenChange, onSave, categories, people }: AllocationDialogProps) {
-  const [categoryId, setCategoryId] = useState("")
-  const [personId, setPersonId] = useState("")
-  const [isLead, setIsLead] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+export function AllocationDialog({
+  open,
+  onOpenChange,
+  onSave,
+  categories,
+  people,
+}: AllocationDialogProps) {
+  const [categoryId, setCategoryId] = useState("");
+  const [personId, setPersonId] = useState("");
+  const [isLead, setIsLead] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {}
+    const newErrors: Record<string, string> = {};
 
     if (!categoryId) {
-      newErrors.categoryId = "Category is required"
+      newErrors.categoryId = "Category is required";
     }
 
     if (!personId) {
-      newErrors.personId = "Person is required"
+      newErrors.personId = "Person is required";
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSave = () => {
-    if (!validateForm()) return
+    if (!validateForm()) return;
 
     onSave({
       id: "",
       categoryId,
       personId,
       isLead,
-    })
+    });
 
     // Reset form
-    setCategoryId("")
-    setPersonId("")
-    setIsLead(false)
-    setErrors({})
-    onOpenChange(false)
-  }
+    setCategoryId("");
+    setPersonId("");
+    setIsLead(false);
+    setErrors({});
+    onOpenChange(false);
+  };
 
   // Filter people by organisation for better UX
-  const [selectedOrg, setSelectedOrg] = useState<string | null>(null)
+  const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
   const filteredPeople = useMemo(() => {
-    return selectedOrg ? people.filter((p) => p.organisation === selectedOrg) : people
-  }, [selectedOrg, people])
+    return selectedOrg
+      ? people.filter((p) => p.organisation === selectedOrg)
+      : people;
+  }, [selectedOrg, people]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] shadow-2xl border-none bg-white">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-gray-900">Add New Allocation</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-gray-900">
+              Add New Allocation
+            </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -77,8 +105,8 @@ export function AllocationDialog({ open, onOpenChange, onSave, categories, peopl
               <Select
                 value={categoryId}
                 onValueChange={(value) => {
-                  setCategoryId(value)
-                  setErrors({ ...errors, categoryId: "" })
+                  setCategoryId(value);
+                  setErrors({ ...errors, categoryId: "" });
                 }}
               >
                 <SelectTrigger
@@ -114,7 +142,9 @@ export function AllocationDialog({ open, onOpenChange, onSave, categories, peopl
               </Label>
               <Select
                 value={selectedOrg || "all"}
-                onValueChange={(value) => setSelectedOrg(value === "all" ? null : value)}
+                onValueChange={(value) =>
+                  setSelectedOrg(value === "all" ? null : value)
+                }
               >
                 <SelectTrigger
                   id="organisation"
@@ -138,8 +168,8 @@ export function AllocationDialog({ open, onOpenChange, onSave, categories, peopl
               <Select
                 value={personId}
                 onValueChange={(value) => {
-                  setPersonId(value)
-                  setErrors({ ...errors, personId: "" })
+                  setPersonId(value);
+                  setErrors({ ...errors, personId: "" });
                 }}
               >
                 <SelectTrigger
@@ -153,7 +183,20 @@ export function AllocationDialog({ open, onOpenChange, onSave, categories, peopl
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((person) => (
                       <SelectItem key={person.id} value={person.id}>
-                        {person.name} ({person.organisation})
+                        <div className="flex items-center gap-2">
+                          <span>
+                            {person.name} ({person.organisation})
+                          </span>
+                          {getOrganizationLogo(person.organisation) && (
+                            <Image
+                              src={getOrganizationLogo(person.organisation)}
+                              alt={`${person.organisation} logo`}
+                              width={16}
+                              height={16}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -202,5 +245,5 @@ export function AllocationDialog({ open, onOpenChange, onSave, categories, peopl
         </motion.div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

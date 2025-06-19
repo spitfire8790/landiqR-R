@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,32 +9,37 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
-import { X } from "lucide-react"
-import type { Task, Category, Person, TaskAllocation } from "@/lib/types"
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
+import type { Task, Category, Person, TaskAllocation } from "@/lib/types";
+import { getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 
 interface SimpleTaskDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (task: Omit<Task, "id" | "createdAt">, allocatedPeople: string[]) => void
-  categories: Category[]
-  availablePeople: Person[]
-  selectedCategoryId?: string
-  task?: Task
-  existingAllocations?: TaskAllocation[]
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (
+    task: Omit<Task, "id" | "createdAt">,
+    allocatedPeople: string[]
+  ) => void;
+  categories: Category[];
+  availablePeople: Person[];
+  selectedCategoryId?: string;
+  task?: Task;
+  existingAllocations?: TaskAllocation[];
 }
 
 export function SimpleTaskDialog({
@@ -47,58 +52,63 @@ export function SimpleTaskDialog({
   task,
   existingAllocations,
 }: SimpleTaskDialogProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [categoryId, setCategoryId] = useState("")
-  const [hoursPerWeek, setHoursPerWeek] = useState<number>(0)
-  const [sourceLink, setSourceLink] = useState("")
-  const [allocatedPeople, setAllocatedPeople] = useState<string[]>([])
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [hoursPerWeek, setHoursPerWeek] = useState<number>(0);
+  const [sourceLink, setSourceLink] = useState("");
+  const [allocatedPeople, setAllocatedPeople] = useState<string[]>([]);
 
   useEffect(() => {
     if (task) {
-      setName(task.name)
-      setDescription(task.description)
-      setCategoryId(task.categoryId)
-      setHoursPerWeek(task.hoursPerWeek || 0)
-      setSourceLink(task.sourceLink || "")
+      setName(task.name);
+      setDescription(task.description);
+      setCategoryId(task.categoryId);
+      setHoursPerWeek(task.hoursPerWeek || 0);
+      setSourceLink(task.sourceLink || "");
       if (existingAllocations) {
-        setAllocatedPeople(existingAllocations.map(allocation => allocation.personId))
+        setAllocatedPeople(
+          existingAllocations.map((allocation) => allocation.personId)
+        );
       }
     } else {
-      setName("")
-      setDescription("")
-      setCategoryId(selectedCategoryId || "")
-      setHoursPerWeek(0)
-      setSourceLink("")
-      setAllocatedPeople([])
+      setName("");
+      setDescription("");
+      setCategoryId(selectedCategoryId || "");
+      setHoursPerWeek(0);
+      setSourceLink("");
+      setAllocatedPeople([]);
     }
-  }, [task, selectedCategoryId, open, existingAllocations])
+  }, [task, selectedCategoryId, open, existingAllocations]);
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (name.trim() && categoryId && hoursPerWeek > 0) {
-      onSave({
-        name: name.trim(),
-        description: description.trim(),
-        categoryId,
-        hoursPerWeek: Number(hoursPerWeek),
-        sourceLink
-      }, allocatedPeople)
-      onOpenChange(false)
+      onSave(
+        {
+          name: name.trim(),
+          description: description.trim(),
+          categoryId,
+          hoursPerWeek: Number(hoursPerWeek),
+          sourceLink,
+        },
+        allocatedPeople
+      );
+      onOpenChange(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   const handlePersonChange = (personId: string, checked: boolean) => {
     if (checked) {
-      setAllocatedPeople([...allocatedPeople, personId])
+      setAllocatedPeople([...allocatedPeople, personId]);
     } else {
-      setAllocatedPeople(allocatedPeople.filter(id => id !== personId))
+      setAllocatedPeople(allocatedPeople.filter((id) => id !== personId));
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,7 +116,9 @@ export function SimpleTaskDialog({
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Add New Task"}</DialogTitle>
           <DialogDescription>
-            {task ? "Update the task details." : "Create a new task for the selected category."}
+            {task
+              ? "Update the task details."
+              : "Create a new task for the selected category."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -124,7 +136,7 @@ export function SimpleTaskDialog({
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="description" className="text-right pt-2">
                 Description
@@ -148,11 +160,13 @@ export function SimpleTaskDialog({
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {categories
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -166,7 +180,7 @@ export function SimpleTaskDialog({
                 min={0}
                 step={0.5}
                 value={hoursPerWeek}
-                onChange={e => setHoursPerWeek(Number(e.target.value))}
+                onChange={(e) => setHoursPerWeek(Number(e.target.value))}
                 className="col-span-3"
                 placeholder="e.g. 5"
                 required
@@ -194,38 +208,62 @@ export function SimpleTaskDialog({
                   <div className="space-y-2">
                     {(availablePeople || [])
                       .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(person => (
-                      <div key={person.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`person-${person.id}`}
-                          checked={allocatedPeople.includes(person.id)}
-                          onCheckedChange={(checked) => handlePersonChange(person.id, !!checked)}
-                        />
-                        <Label 
-                          htmlFor={`person-${person.id}`}
-                          className="text-sm font-normal cursor-pointer flex-1"
+                      .map((person) => (
+                        <div
+                          key={person.id}
+                          className="flex items-center space-x-2"
                         >
-                          {person.name} ({person.organisation})
-                        </Label>
-                      </div>
-                    ))}
+                          <Checkbox
+                            id={`person-${person.id}`}
+                            checked={allocatedPeople.includes(person.id)}
+                            onCheckedChange={(checked) =>
+                              handlePersonChange(person.id, !!checked)
+                            }
+                          />
+                          <Label
+                            htmlFor={`person-${person.id}`}
+                            className="text-sm font-normal cursor-pointer flex-1 flex items-center gap-2"
+                          >
+                            <span>
+                              {person.name} ({person.organisation})
+                            </span>
+                            {getOrganizationLogo(person.organisation) && (
+                              <Image
+                                src={getOrganizationLogo(person.organisation)}
+                                alt={`${person.organisation} logo`}
+                                width={12}
+                                height={12}
+                                className="flex-shrink-0"
+                              />
+                            )}
+                          </Label>
+                        </div>
+                      ))}
                   </div>
                 </ScrollArea>
                 {allocatedPeople.length > 0 && (
                   <div className="mt-2">
                     <Label className="text-sm text-gray-600">Selected:</Label>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {allocatedPeople.map(personId => {
-                        const person = (availablePeople || []).find(p => p.id === personId)
+                      {allocatedPeople.map((personId) => {
+                        const person = (availablePeople || []).find(
+                          (p) => p.id === personId
+                        );
                         return person ? (
-                          <Badge key={personId} variant="secondary" className="text-xs">
+                          <Badge
+                            key={personId}
+                            variant="secondary"
+                            className="text-xs"
+                          >
                             {person.name}
-                            <X 
-                              className="ml-1 h-3 w-3 cursor-pointer" 
-                              onClick={() => handlePersonChange(personId, false)} 
+                            <X
+                              className="ml-1 h-3 w-3 cursor-pointer"
+                              onClick={() =>
+                                handlePersonChange(personId, false)
+                              }
                             />
                           </Badge>
-                        ) : null
+                        ) : null;
                       })}
                     </div>
                   </div>
@@ -244,5 +282,5 @@ export function SimpleTaskDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -43,7 +43,8 @@ import {
   Workflow,
   Wrench,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 import type {
   Task,
   Responsibility,
@@ -110,6 +111,7 @@ export default function SimpleTasksView({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("name-asc");
+  const [personFilter, setPersonFilter] = useState<string>("all");
 
   // Dialog states
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -128,7 +130,9 @@ export default function SimpleTasksView({
   useEffect(() => {
     if (initialSelectedCategoryId) {
       // Find the group that contains this category
-      const category = categories.find((cat) => cat.id === initialSelectedCategoryId);
+      const category = categories.find(
+        (cat) => cat.id === initialSelectedCategoryId
+      );
       if (category) {
         setSelectedGroupId(category.groupId);
         setSelectedCategoryId(initialSelectedCategoryId);
@@ -138,9 +142,10 @@ export default function SimpleTasksView({
   }, [initialSelectedCategoryId, categories]);
 
   // Get categories for selected group
-  const filteredCategories = categories.filter(
-    (cat) => cat.groupId === selectedGroupId
-  );
+  const filteredCategories =
+    selectedGroupId === "all"
+      ? categories // Show all categories when "All Groups" is selected
+      : categories.filter((cat) => cat.groupId === selectedGroupId);
 
   // Load tasks when category is selected or when showing all tasks
   useEffect(() => {
@@ -579,13 +584,24 @@ export default function SimpleTasksView({
     });
   };
 
-  // Filter tasks by category
+  // Filter tasks by category and person
   const filterTasksByCategory = (tasks: Task[]) => {
     if (categoryFilter === "all") return tasks;
     return tasks.filter((task) => task.categoryId === categoryFilter);
   };
 
-  const filteredTasks = filterTasksByCategory(tasks);
+  const filterTasksByPerson = (tasks: Task[]) => {
+    if (personFilter === "all") return tasks;
+
+    return tasks.filter((task) => {
+      const allocations = taskAllocations[task.id] || [];
+      return allocations.some(
+        (allocation) => allocation.personId === personFilter
+      );
+    });
+  };
+
+  const filteredTasks = filterTasksByPerson(filterTasksByCategory(tasks));
   const sortedTasks = sortTasks(filteredTasks);
 
   const handleSort = (field: string) => {
@@ -657,6 +673,7 @@ export default function SimpleTasksView({
                 <SelectValue placeholder="Select a group" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Groups</SelectItem>
                 {groups
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((group) => (
@@ -675,7 +692,6 @@ export default function SimpleTasksView({
             <Select
               value={selectedCategoryId}
               onValueChange={setSelectedCategoryId}
-              disabled={!selectedGroupId}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
@@ -696,22 +712,21 @@ export default function SimpleTasksView({
           {selectedCategoryId && (
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sort by
+                Filter by Person
               </label>
-              <Select
-                value={sortOption}
-                onValueChange={(value: SortOption) => setSortOption(value)}
-              >
+              <Select value={personFilter} onValueChange={setPersonFilter}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="All People" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                  <SelectItem value="created-asc">Created (Oldest)</SelectItem>
-                  <SelectItem value="created-desc">Created (Newest)</SelectItem>
-                  <SelectItem value="hours-asc">Hours (Low-High)</SelectItem>
-                  <SelectItem value="hours-desc">Hours (High-Low)</SelectItem>
+                  <SelectItem value="all">All People</SelectItem>
+                  {people
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.name} ({person.organisation})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -751,10 +766,10 @@ export default function SimpleTasksView({
           <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500 mb-2">
-              Select a group and category to view tasks
+              Select a category to view tasks
             </p>
             <p className="text-sm text-gray-400">
-              Choose from the dropdowns above to get started
+              Choose from the dropdown above to get started
             </p>
           </div>
         ) : loading ? (
@@ -862,13 +877,34 @@ export default function SimpleTasksView({
                                 const orgColor = getOrgColor(
                                   allocation.personId
                                 );
+                                const person =
+                                  people.find(
+                                    (p) => p.id === allocation.personId
+                                  ) ||
+                                  availablePeople.find(
+                                    (p) => p.id === allocation.personId
+                                  );
                                 return (
                                   <span
                                     key={allocation.id}
-                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white"
-                                    style={{ backgroundColor: orgColor }}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-black bg-transparent border-2"
+                                    style={{ borderColor: orgColor }}
                                   >
-                                    {personName}
+                                    <span>{personName}</span>
+                                    {person &&
+                                      getOrganizationLogo(
+                                        person.organisation
+                                      ) && (
+                                        <Image
+                                          src={getOrganizationLogo(
+                                            person.organisation
+                                          )}
+                                          alt={`${person.organisation} logo`}
+                                          width={12}
+                                          height={12}
+                                          className="flex-shrink-0"
+                                        />
+                                      )}
                                   </span>
                                 );
                               })
