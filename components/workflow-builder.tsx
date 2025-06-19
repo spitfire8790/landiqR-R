@@ -16,6 +16,8 @@ import {
   ReactFlowProvider,
   Handle,
   Position,
+  EdgeMouseHandler,
+  NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Button } from "@/components/ui/button";
@@ -234,8 +236,8 @@ export function WorkflowBuilder({
   existingWorkflow,
   onSave,
 }: WorkflowBuilderProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [workflowName, setWorkflowName] = useState(
     existingWorkflow?.name || ""
   );
@@ -301,18 +303,18 @@ export function WorkflowBuilder({
 
   // Handle selection changes
   const onSelectionChange = useCallback(
-    ({ nodes, edges }) => {
+    ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
       // Update selection state in nodes and edges
       setNodes((nds) =>
         nds.map((node) => ({
           ...node,
-          selected: nodes.some((n: any) => n.id === node.id),
+          selected: nodes.some((n) => n.id === node.id),
         }))
       );
       setEdges((eds) =>
         eds.map((edge) => ({
           ...edge,
-          selected: edges.some((e: any) => e.id === edge.id),
+          selected: edges.some((e) => e.id === edge.id),
         }))
       );
     },
@@ -342,10 +344,32 @@ export function WorkflowBuilder({
   }, [existingWorkflow, tools, people, setNodes, setEdges]);
 
   // Node click handler
-  const onNodeClick = useCallback((event, node) => {
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     setEditingNodeId(node.id);
     setStepDialogOpen(true);
   }, []);
+
+  // Edge click handler for selection
+  const onEdgeClick: EdgeMouseHandler = useCallback((event, edge) => {
+    // Prevent event bubbling to avoid deselecting
+    event.stopPropagation();
+    
+    // Update edge selection state
+    setEdges((eds) =>
+      eds.map((e) => ({
+        ...e,
+        selected: e.id === edge.id,
+      }))
+    );
+    
+    // Clear node selection when edge is selected
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        selected: false,
+      }))
+    );
+  }, [setEdges, setNodes]);
 
   // Add new step node
   const addStepNode = () => {
@@ -441,11 +465,13 @@ export function WorkflowBuilder({
     ...edge,
     animated: true,
     style: {
-      strokeDasharray: "5,5",
-      stroke: "#3b82f6",
-      strokeWidth: 2,
+      strokeDasharray: edge.selected ? "0,0" : "5,5",
+      stroke: edge.selected ? "#ef4444" : "#3b82f6", // Red when selected, blue otherwise
+      strokeWidth: edge.selected ? 3 : 2, // Thicker when selected
     },
     type: "smoothstep",
+    // Add selection styling
+    className: edge.selected ? "selected-edge" : "",
   }));
 
   return (
@@ -669,6 +695,7 @@ export function WorkflowBuilder({
           onEdgesChange={onEdgesChange}
           onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
