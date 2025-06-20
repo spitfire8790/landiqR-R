@@ -528,10 +528,21 @@ export default function TasksView({
         </div>
 
         <div className="flex gap-2">
-          {selectedCategoryId && selectedCategoryId !== "all" && (
+          {selectedCategoryId && selectedCategoryId !== "all" && isAdmin && (
             <Button onClick={() => setTaskDialogOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Task
+            </Button>
+          )}
+          {selectedCategoryId && selectedCategoryId !== "all" && (
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSelectedCategoryId("all");
+                setSelectedGroupId("");
+              }}
+            >
+              Clear Filter
             </Button>
           )}
           <Button onClick={handleRefreshTasks}>

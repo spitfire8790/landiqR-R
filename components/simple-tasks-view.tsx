@@ -956,33 +956,6 @@ export default function SimpleTasksView({
         )}
       </div>
 
-      {/* Filter Controls */}
-      {selectedGroupId && (
-        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Filter by Category:</label>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {filteredCategories
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Showing {filteredTasks.length} of {tasks.length} tasks
-          </div>
-        </div>
-      )}
-
       {/* Dialogs */}
       <SimpleTaskDialog
         open={taskDialogOpen}
