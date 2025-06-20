@@ -305,15 +305,20 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
           <div className="mt-2">
             <div className="space-y-1">
               {data.links.slice(0, 2).map((link: any, index: number) => (
-                <div key={index} className="flex items-center gap-2 text-xs">
-                  <ExternalLink className="w-3 h-3 text-purple-600" />
-                  <span
-                    className="text-purple-700 truncate"
-                    title={link.description || link.url}
-                  >
-                    {link.description || "Link"}
+                <a
+                  key={index}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 text-xs text-purple-700 hover:underline"
+                  title={link.description || link.url}
+                >
+                  <ExternalLink className="w-3 h-3 text-purple-600 flex-shrink-0" />
+                  <span className="truncate">
+                    {link.description || link.url || "Link"}
                   </span>
-                </div>
+                </a>
               ))}
               {data.links.length > 2 && (
                 <div className="text-xs text-purple-600">
@@ -469,23 +474,27 @@ export function WorkflowBuilder({
           return;
         }
 
-        // Check if we're actually focused on the workflow canvas
-        const workflowCanvas = document.querySelector(".react-flow");
-        if (!workflowCanvas || !workflowCanvas.contains(target)) {
-          return;
-        }
+        // Check if any nodes or edges are selected
+        const hasSelectedNodes = nodes.some((node) => node.selected);
+        const hasSelectedEdges = edges.some((edge) => edge.selected);
 
-        // Only prevent default and delete nodes/edges if we're focused on the workflow canvas
-        event.preventDefault();
-        event.stopPropagation();
-        setEdges((edges) => edges.filter((edge) => !edge.selected));
-        setNodes((nodes) => nodes.filter((node) => !node.selected));
+        if (hasSelectedNodes || hasSelectedEdges) {
+          // Prevent default behavior and delete selected items
+          event.preventDefault();
+          event.stopPropagation();
+
+          // Delete selected edges
+          setEdges((edges: Edge[]) => edges.filter((edge) => !edge.selected));
+
+          // Delete selected nodes
+          setNodes((nodes: Node[]) => nodes.filter((node) => !node.selected));
+        }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, nodes, edges]);
 
   // Handle selection changes
   const onSelectionChange = useCallback(
@@ -694,13 +703,13 @@ export function WorkflowBuilder({
     }
   };
 
-  // Add animated property to all edges
+  // Add solid grey styling to all edges
   const animatedEdges = edges.map((edge) => ({
     ...edge,
-    animated: true,
+    animated: false,
     style: {
-      strokeDasharray: edge.selected ? "0,0" : "5,5",
-      stroke: edge.selected ? "#ef4444" : "#3b82f6", // Red when selected, blue otherwise
+      strokeDasharray: "0,0", // Solid line
+      stroke: edge.selected ? "#ef4444" : "#6b7280", // Red when selected, grey otherwise
       strokeWidth: edge.selected ? 3 : 2, // Thicker when selected
     },
     type: "smoothstep",

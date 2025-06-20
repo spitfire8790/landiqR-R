@@ -10,6 +10,8 @@ import {
   ListOrdered,
   Undo,
   Redo,
+  Indent,
+  Outdent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -121,6 +123,16 @@ export function RichTextEditor({
           break;
       }
     }
+
+    // Handle Tab / Shift+Tab for indenting lists
+    if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        executeCommand("outdent");
+      } else {
+        executeCommand("indent");
+      }
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -205,6 +217,29 @@ export function RichTextEditor({
           variant="ghost"
           size="sm"
           onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => handleButtonClick(e, () => executeCommand("indent"))}
+          className="h-8 w-8 p-0"
+          title="Indent (Tab)"
+        >
+          <Indent className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => handleButtonClick(e, () => executeCommand("outdent"))}
+          className="h-8 w-8 p-0"
+          title="Outdent (Shift+Tab)"
+        >
+          <Outdent className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => handleButtonClick(e, () => executeCommand("undo"))}
           className="h-8 w-8 p-0"
           title="Undo (Ctrl+Z)"
@@ -232,53 +267,59 @@ export function RichTextEditor({
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         className={cn(
-          "p-3 min-h-[100px] outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+          "p-3 min-h-[100px] outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 prose prose-sm max-w-none",
           `min-h-[${rows * 24}px]`
         )}
         style={{
           minHeight: `${rows * 24}px`,
-          // Ensure lists are displayed properly
-          listStylePosition: "inside",
         }}
         suppressContentEditableWarning={true}
         data-placeholder={placeholder}
       />
 
-      <style jsx>{`
+      <style jsx global>{`
         [contenteditable]:empty:before {
           content: attr(data-placeholder);
           color: #9ca3af;
           pointer-events: none;
         }
-        [contenteditable] ul {
-          margin: 0.5em 0;
-          padding-left: 1.5em;
+        div[contenteditable] ul,
+        div[contenteditable] ol {
+          margin: 0.5em 0 !important;
+          padding-left: 2em !important;
+          list-style-position: outside !important;
+        }
+        div[contenteditable] ul {
           list-style-type: disc !important;
-          list-style-position: outside !important;
         }
-        [contenteditable] ol {
-          margin: 0.5em 0;
-          padding-left: 1.5em;
+        div[contenteditable] ol {
           list-style-type: decimal !important;
-          list-style-position: outside !important;
         }
-        [contenteditable] li {
-          margin: 0.2em 0;
+        div[contenteditable] li {
+          margin: 0.2em 0 !important;
           display: list-item !important;
           list-style: inherit !important;
         }
-        [contenteditable] ul li::marker {
-          content: "•";
-          color: inherit;
+        div[contenteditable] ul li {
+          list-style-type: disc !important;
         }
-        [contenteditable] strong {
-          font-weight: bold;
+        div[contenteditable] ol li {
+          list-style-type: decimal !important;
         }
-        [contenteditable] em {
-          font-style: italic;
+        div[contenteditable] ul ul {
+          list-style-type: circle !important;
         }
-        [contenteditable] u {
-          text-decoration: underline;
+        div[contenteditable] ul ul ul {
+          list-style-type: square !important;
+        }
+        div[contenteditable] strong {
+          font-weight: bold !important;
+        }
+        div[contenteditable] em {
+          font-style: italic !important;
+        }
+        div[contenteditable] u {
+          text-decoration: underline !important;
         }
       `}</style>
     </div>
