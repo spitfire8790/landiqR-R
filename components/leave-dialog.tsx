@@ -177,13 +177,21 @@ export function LeaveDialog({
                 Adding leave for <strong>{selectedPerson.name}</strong> from{" "}
                 <strong>
                   {formData.startDate
-                    ? new Date(formData.startDate).toLocaleDateString()
+                    ? new Date(formData.startDate).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
                     : "Start Date"}
                 </strong>{" "}
                 to{" "}
                 <strong>
                   {formData.endDate
-                    ? new Date(formData.endDate).toLocaleDateString()
+                    ? new Date(formData.endDate).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
                     : "End Date"}
                 </strong>
               </p>

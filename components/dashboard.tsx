@@ -894,6 +894,7 @@ export default function Dashboard() {
               tasks={tasks}
               taskAllocations={taskAllocations}
               categories={categories}
+              allocations={allocations}
               currentUserId={userId || undefined}
               currentUserEmail={userEmail || undefined}
               isAdmin={isAdmin}

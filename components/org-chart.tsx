@@ -30,7 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { Badge } from "@/components/ui/badge";
 import { fetchTasksByCategory, fetchTaskAllocations } from "@/lib/data-service";
 import {
@@ -192,18 +192,13 @@ function GroupContainer({
           <div className="flex gap-2 mt-3">
             {categories.map((category) => (
               <SortableCategory key={category.id} category={category}>
-                <motion.div
+                <div
                   className={cn(
-                    "p-2 rounded-lg shadow-lg border-2 transition-all duration-200 w-32 h-[80px] flex items-start relative overflow-hidden",
+                    "p-2 rounded-lg shadow-lg border-2 transition-all duration-200 w-32 h-[80px] flex items-start relative overflow-hidden cursor-pointer",
                     highlightedCategory === category.id
                       ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white border-indigo-400 shadow-indigo-500/50 dark:neon-pink-glow"
                       : "bg-slate-400 text-white border-slate-300 shadow-slate-400/30 hover:bg-slate-500 hover:shadow-slate-500/50 transform hover:scale-105"
                   )}
-                  whileHover={{
-                    y: -2,
-                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
-                  }}
-                  transition={{ duration: 0.2 }}
                   onClick={() => {
                     setHighlightedCategory(
                       highlightedCategory === category.id ? null : category.id
@@ -217,7 +212,7 @@ function GroupContainer({
                   </div>
                   {/* Subtle shine effect */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
-                </motion.div>
+                </div>
               </SortableCategory>
             ))}
           </div>
@@ -652,11 +647,7 @@ export default function OrgChart({
         <div className="flex-1 flex flex-col overflow-hidden">
           {!hasData ? (
             <div className="h-full flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-w-md"
-              >
+              <div className="text-center bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-w-md">
                 <AlertCircle className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   No data available yet
@@ -674,17 +665,13 @@ export default function OrgChart({
                     Add First Group
                   </Button>
                 </div>
-              </motion.div>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden p-2 sm:p-4">
               {categories.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center py-12 px-6 flex flex-col items-center"
-                  >
+                  <div className="text-center py-12 px-6 flex flex-col items-center">
                     {groups.length === 0 ? (
                       <>
                         <p className="text-gray-500 dark:text-gray-400 mb-4">
@@ -712,7 +699,7 @@ export default function OrgChart({
                         </Button>
                       </>
                     )}
-                  </motion.div>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-auto h-full">
@@ -807,14 +794,15 @@ export default function OrgChart({
                                             if (
                                               !allAllocations.some(
                                                 (existing) =>
-                                                  existing.id === alloc.id
+                                                  existing.personId ===
+                                                  alloc.personId
                                               )
                                             ) {
                                               allAllocations.push(alloc);
                                             }
                                           });
 
-                                          // Add task allocations (avoiding duplicates)
+                                          // Add task allocations (avoiding duplicates by personId)
                                           taskAllocations.forEach(
                                             (taskAlloc) => {
                                               if (
@@ -859,7 +847,7 @@ export default function OrgChart({
                                                   };
 
                                                   return (
-                                                    <motion.div
+                                                    <div
                                                       key={allocation.id}
                                                       className={cn(
                                                         "flex items-center justify-between gap-2 p-2 rounded text-xs group border",
@@ -867,18 +855,6 @@ export default function OrgChart({
                                                           person.organisation
                                                         )
                                                       )}
-                                                      initial={{
-                                                        opacity: 0,
-                                                        y: 10,
-                                                      }}
-                                                      animate={{
-                                                        opacity: 1,
-                                                        y: 0,
-                                                      }}
-                                                      exit={{
-                                                        opacity: 0,
-                                                        y: -10,
-                                                      }}
                                                     >
                                                       <div className="flex items-center gap-1 min-w-0 flex-1">
                                                         <User className="h-3 w-3 flex-shrink-0" />
@@ -902,14 +878,7 @@ export default function OrgChart({
                                                           <Star className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                                                         )}
                                                       </div>
-                                                      <motion.div
-                                                        whileHover={{
-                                                          scale: 1.1,
-                                                        }}
-                                                        whileTap={{
-                                                          scale: 0.9,
-                                                        }}
-                                                      >
+                                                      <div>
                                                         <Button
                                                           variant="ghost"
                                                           size="icon"
@@ -925,8 +894,8 @@ export default function OrgChart({
                                                             Remove
                                                           </span>
                                                         </Button>
-                                                      </motion.div>
-                                                    </motion.div>
+                                                      </div>
+                                                    </div>
                                                   );
                                                 }
                                               )}

@@ -287,10 +287,16 @@ export default function WorkflowsTable({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(workflow.createdAt).toLocaleDateString()}
+                        {new Date(workflow.createdAt).toLocaleDateString(
+                          "en-GB",
+                          { day: "numeric", month: "long", year: "numeric" }
+                        )}
                       </TableCell>
                       <TableCell>
-                        {new Date(workflow.updatedAt).toLocaleDateString()}
+                        {new Date(workflow.updatedAt).toLocaleDateString(
+                          "en-GB",
+                          { day: "numeric", month: "long", year: "numeric" }
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">

@@ -27,6 +27,7 @@ import type {
   Task,
   TaskAllocation,
   Category,
+  Allocation,
   Leave,
 } from "@/lib/types";
 
@@ -38,23 +39,21 @@ interface CalendarViewProps {
   tasks?: Task[];
   taskAllocations?: TaskAllocation[];
   categories?: Category[];
+  allocations?: Allocation[];
   currentUserId?: string;
   currentUserEmail?: string;
   isAdmin?: boolean;
 }
 
 interface RiskItem {
+  taskId: string;
+  taskName: string;
   categoryId: string;
   categoryName: string;
-  riskLevel: "single" | "double";
-  affectedTasks: {
-    taskId: string;
-    taskName: string;
-    personId: string;
-    personName: string;
-    leaveStart: string;
-    leaveEnd: string;
-  }[];
+  personId: string;
+  personName: string;
+  leaveStart: string;
+  leaveEnd: string;
 }
 
 export default function CalendarView({
@@ -63,6 +62,7 @@ export default function CalendarView({
   tasks = [],
   taskAllocations = [],
   categories = [],
+  allocations = [],
   currentUserId,
   currentUserEmail,
   isAdmin = false,
@@ -122,7 +122,6 @@ export default function CalendarView({
     });
 
     const risks: RiskItem[] = [];
-    const categoryRisks = new Map<string, RiskItem>();
 
     upcomingLeave.forEach((leave) => {
       const person = people.find((p) => p.id === leave.personId);
@@ -137,48 +136,35 @@ export default function CalendarView({
         const task = tasks.find((t) => t.id === allocation.taskId);
         if (!task) return;
 
-        // Check if this person is the only one allocated to this task
+        // Check how many people are allocated to this specific task
         const taskAllocationsForTask = taskAllocations.filter(
           (ta) => ta.taskId === task.id
         );
-        const isOnlyPerson = taskAllocationsForTask.length === 1;
 
-        if (isOnlyPerson) {
-          const category = categories.find((c) => c.id === task.categoryId);
-          if (!category) return;
+        const category = categories.find((c) => c.id === task.categoryId);
+        if (!category) return;
 
-          const categoryId = category.id;
-          const categoryName = category.name;
+        // Only consider it a risk if this person is the only one allocated to the task
+        const isOnlyPersonOnTask = taskAllocationsForTask.length === 1;
 
-          if (!categoryRisks.has(categoryId)) {
-            categoryRisks.set(categoryId, {
-              categoryId,
-              categoryName,
-              riskLevel: "single",
-              affectedTasks: [],
-            });
-          }
-
-          const existingRisk = categoryRisks.get(categoryId)!;
-          existingRisk.affectedTasks.push({
+        if (isOnlyPersonOnTask) {
+          // Add this task as a risk item
+          risks.push({
             taskId: task.id,
             taskName: task.name,
+            categoryId: category.id,
+            categoryName: category.name,
             personId: person.id,
             personName: person.name,
             leaveStart: leave.startDate,
             leaveEnd: leave.endDate,
           });
-
-          // Check if this creates a double risk (multiple single-person tasks affected)
-          if (existingRisk.affectedTasks.length > 1) {
-            existingRisk.riskLevel = "double";
-          }
         }
       });
     });
 
-    return Array.from(categoryRisks.values());
-  }, [leaveData, people, tasks, taskAllocations, categories]);
+    return risks;
+  }, [leaveData, people, tasks, taskAllocations, categories, allocations]);
 
   const handleRiskClick = (risk: RiskItem) => {
     setSelectedRisk(risk);
@@ -413,38 +399,32 @@ export default function CalendarView({
                 ) : (
                   <div className="space-y-2">
                     <p className="mb-2">Critical risks for the next month:</p>
-                    {riskAnalysis.map((risk) => (
+                    {riskAnalysis.map((risk, index) => (
                       <div
-                        key={risk.categoryId}
+                        key={`${risk.taskId}-${index}`}
                         className="cursor-pointer hover:bg-gray-50 p-2 rounded border"
                         onClick={() => handleRiskClick(risk)}
                       >
                         <div className="flex items-center">
-                          <div
-                            className={`w-2 h-2 rounded-full mr-2 ${
-                              risk.riskLevel === "double"
-                                ? "bg-red-600 shadow-lg"
-                                : "bg-red-500"
-                            }`}
-                          ></div>
-                          <span
-                            className={`text-xs font-medium ${
-                              risk.riskLevel === "double"
-                                ? "text-red-700"
-                                : "text-red-600"
-                            }`}
-                          >
-                            {risk.categoryName}
+                          <div className="w-2 h-2 rounded-full mr-2 bg-red-500"></div>
+                          <span className="text-xs font-medium text-red-600">
+                            {risk.taskName}
                           </span>
-                          {risk.riskLevel === "double" && (
-                            <span className="ml-1 text-xs text-red-700 font-bold">
-                              ⚠⚠
-                            </span>
-                          )}
                         </div>
                         <div className="text-xs text-gray-500 ml-4">
-                          {risk.affectedTasks.length} task
-                          {risk.affectedTasks.length > 1 ? "s" : ""} at risk
+                          {risk.categoryName} • {risk.personName}
+                        </div>
+                        <div className="text-xs text-gray-400 ml-4">
+                          {new Date(risk.leaveStart).toLocaleDateString(
+                            "en-GB",
+                            { day: "numeric", month: "long", year: "numeric" }
+                          )}{" "}
+                          -{" "}
+                          {new Date(risk.leaveEnd).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
                         </div>
                       </div>
                     ))}
@@ -548,68 +528,62 @@ export default function CalendarView({
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
-              Risk Details: {selectedRisk?.categoryName}
-              {selectedRisk?.riskLevel === "double" && (
-                <span className="ml-2 text-red-700 font-bold">⚠⚠ CRITICAL</span>
-              )}
+              Task Risk Details: {selectedRisk?.taskName}
             </DialogTitle>
           </DialogHeader>
           {selectedRisk && (
             <div className="space-y-4">
               <div className="text-sm text-gray-600">
-                This category has {selectedRisk.affectedTasks.length} task
-                {selectedRisk.affectedTasks.length > 1 ? "s" : ""} at risk due
-                to key personnel being on leave.
+                This task will have no coverage during the leave period as only
+                one person is allocated to it.
               </div>
 
-              <div className="space-y-3">
-                {selectedRisk.affectedTasks.map((task, index) => (
-                  <div
-                    key={`${task.taskId}-${index}`}
-                    className="border p-3 rounded-lg bg-red-50"
-                  >
-                    <div className="font-medium text-red-800 mb-2">
-                      Task: {task.taskName}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">
-                          Person:
-                        </span>
-                        <div className="text-gray-600">{task.personName}</div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">
-                          Leave Start:
-                        </span>
-                        <div className="text-gray-600">
-                          {new Date(task.leaveStart).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">
-                          Leave End:
-                        </span>
-                        <div className="text-gray-600">
-                          {new Date(task.leaveEnd).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-red-700 bg-red-100 p-2 rounded">
-                      ⚠️ This person is the only one assigned to this task
+              <div className="border p-4 rounded-lg bg-red-50">
+                <div className="font-medium text-red-800 mb-3">
+                  Task: {selectedRisk.taskName}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Category:</span>
+                    <div className="text-gray-600">
+                      {selectedRisk.categoryName}
                     </div>
                   </div>
-                ))}
-              </div>
-
-              {selectedRisk.riskLevel === "double" && (
-                <div className="bg-red-100 border border-red-300 p-3 rounded-lg">
-                  <div className="text-red-800 font-medium text-sm">
-                    🚨 CRITICAL RISK: Multiple tasks in this category will have
-                    no coverage during leave periods.
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Assigned Person:
+                    </span>
+                    <div className="text-gray-600">
+                      {selectedRisk.personName}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Leave Start:
+                    </span>
+                    <div className="text-gray-600">
+                      {new Date(selectedRisk.leaveStart).toLocaleDateString(
+                        "en-GB",
+                        { day: "numeric", month: "long", year: "numeric" }
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Leave End:
+                    </span>
+                    <div className="text-gray-600">
+                      {new Date(selectedRisk.leaveEnd).toLocaleDateString(
+                        "en-GB",
+                        { day: "numeric", month: "long", year: "numeric" }
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
+                <div className="mt-3 text-xs text-red-700 bg-red-100 p-2 rounded">
+                  This person is the only one assigned to this task
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
