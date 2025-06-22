@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,8 +12,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Edit, Trash2, Users, Clock, RefreshCw } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Users,
+  Clock,
+  ExternalLink,
+  RefreshCw,
+  Layers,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,21 +29,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast"; // Fix useToast import
-import { TaskDialog } from "@/components/task-dialog";
-import { ResponsibilityDialog } from "@/components/responsibility-dialog";
-import TaskAllocationDialog from "@/components/task-allocation-dialog";
-import { WorkflowDialog } from "@/components/workflow-dialog";
-import { WorkflowToolsDialog } from "@/components/workflow-tools-dialog";
+import {
+  PlusCircle,
+  User,
+  Edit as EditIcon,
+  Trash2 as TrashIcon,
+  Users as UsersIcon,
+  Clock as ClockIcon,
+  AlertCircle,
+  ArrowUpDown,
+  ExternalLinkIcon,
+  ChevronUp,
+  ChevronDown,
+  Workflow,
+  Wrench,
+} from "lucide-react";
+import { cn, getOrganizationLogo } from "@/lib/utils";
+import Image from "next/image";
 import type {
   Task,
   Responsibility,
   TaskAllocation,
-  TaskSourceLink,
   Group,
   Category,
   Person,
 } from "@/lib/types";
+import { SimpleTaskDialog } from "@/components/simple-task-dialog";
+import { ResponsibilityDialog } from "@/components/responsibility-dialog";
+import TaskAllocationDialog from "@/components/task-allocation-dialog";
 import {
   fetchTasksByCategory,
   fetchResponsibilities,
@@ -48,97 +69,108 @@ import {
   deleteResponsibility,
   createTaskAllocation,
   deleteTaskAllocation,
-  createTaskSourceLink,
+  getPeopleAllocatedToCategory,
 } from "@/lib/data-service";
-import { format } from "date-fns";
-import { cn, getOrganizationLogo } from "@/lib/utils";
-import Image from "next/image";
-import {
-  PlusCircle,
-  Calendar,
-  Clock as ClockIcon,
-  User,
-  CheckCircle2,
-  Circle,
-  AlertCircle,
-  Play,
-  Pause,
-  Edit as EditIcon,
-  Trash2 as Trash2Icon,
-  Users as UsersIcon,
-  Workflow,
-  Wrench,
-  ExternalLink,
-} from "lucide-react";
-import { getPeopleAllocatedToCategory } from "@/lib/data-service";
+import { useToast } from "@/components/ui/use-toast";
+import { WorkflowDialog } from "@/components/workflow-dialog";
+import { WorkflowToolsDialog } from "@/components/workflow-tools-dialog";
 
 interface TasksViewProps {
   groups: Group[];
   categories: Category[];
   people: Person[];
   isAdmin: boolean;
+  selectedCategoryId?: string | null;
+  onDataChange?: () => void;
 }
+
+type SortOption =
+  | "name-asc"
+  | "name-desc"
+  | "created-asc"
+  | "created-desc"
+  | "hours-asc"
+  | "hours-desc";
 
 export default function TasksView({
   groups,
   categories,
   people,
   isAdmin,
+  selectedCategoryId: initialSelectedCategoryId,
+  onDataChange,
 }: TasksViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [responsibilities, setResponsibilities] = useState<
-    Record<string, Responsibility[]>
-  >({});
   const [taskAllocations, setTaskAllocations] = useState<
     Record<string, TaskAllocation[]>
   >({});
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
-  const [responsibilityDialogOpen, setResponsibilityDialogOpen] =
-    useState(false);
-  const [taskAllocationDialogOpen, setTaskAllocationDialogOpen] =
-    useState(false);
-  const [editingTask, setEditingTask] = useState<Task | undefined>();
-  const [editingResponsibility, setEditingResponsibility] = useState<
-    Responsibility | undefined
-  >();
-  const [currentTaskId, setCurrentTaskId] = useState<string>("");
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [availablePeople, setAvailablePeople] = useState<Person[]>([]);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+  const [sortOption, setSortOption] = useState<SortOption>("name-asc");
+  const [personFilter, setPersonFilter] = useState<string>("all");
 
   // Dialog states
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-
-  // Add state for workflow dialogs
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
+  const [editingAllocation, setEditingAllocation] = useState<
+    TaskAllocation | undefined
+  >(undefined);
   const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
   const [workflowToolsDialogOpen, setWorkflowToolsDialogOpen] = useState(false);
   const [workflowTask, setWorkflowTask] = useState<Task | null>(null);
 
-  // Get categories for selected group (sorted alphabetically)
-  const filteredCategories = categories
-    .filter((cat) => cat.groupId === selectedGroupId)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const { toast } = useToast();
 
-  // Get all categories (sorted alphabetically) for independent filtering
-  const allCategories = categories.sort((a, b) => a.name.localeCompare(b.name));
+  // Handle initial category selection from prop
+  useEffect(() => {
+    if (initialSelectedCategoryId) {
+      // Find the group that contains this category
+      const category = categories.find(
+        (cat) => cat.id === initialSelectedCategoryId
+      );
+      if (category) {
+        setSelectedGroupId(category.groupId);
+        setSelectedCategoryId(initialSelectedCategoryId);
+        setCategoryFilter(initialSelectedCategoryId);
+      }
+    }
+  }, [initialSelectedCategoryId, categories]);
+
+  // Keep categoryFilter in sync with selectedCategoryId
+  useEffect(() => {
+    setCategoryFilter(selectedCategoryId);
+  }, [selectedCategoryId]);
+
+  // Get categories for selected group
+  const filteredCategories =
+    selectedGroupId === "all"
+      ? categories // Show all categories when "All Groups" is selected
+      : categories.filter((cat) => cat.groupId === selectedGroupId);
 
   // Load tasks when category is selected or when showing all tasks
   useEffect(() => {
     if (selectedCategoryId === "all") {
-      // Load all tasks
-      loadTasksForCategory();
+      // If "all" is selected and we have a group selected, load tasks for that group
+      if (selectedGroupId && selectedGroupId !== "all") {
+        loadTasksForGroup(selectedGroupId);
+      } else {
+        // Load all tasks across all categories
+        loadTasksForCategory();
+      }
+      // No specific people to load for "all" view
+      setAvailablePeople([]);
     } else if (selectedCategoryId) {
       // Load tasks for specific category
       loadTasksForCategory(selectedCategoryId);
       loadAvailablePeople(selectedCategoryId);
-    } else if (selectedGroupId) {
-      // Load tasks for all categories in the selected group
-      loadTasksForGroup(selectedGroupId);
     } else {
       setTasks([]);
-      setResponsibilities({});
       setTaskAllocations({});
       setAvailablePeople([]);
     }
@@ -147,24 +179,32 @@ export default function TasksView({
   const loadTasksForCategory = async (categoryId?: string) => {
     setLoading(true);
     try {
+      console.log(`Loading tasks for category: ${categoryId || "all"}`);
       const tasksData = await fetchTasksByCategory(categoryId);
-      setTasks(tasksData);
+      console.log(`Fetched ${tasksData.length} tasks:`, tasksData);
 
-      // Load responsibilities and allocations for each task
-      const responsibilitiesData: Record<string, Responsibility[]> = {};
+      // Load allocations for each task
       const allocationsData: Record<string, TaskAllocation[]> = {};
 
       for (const task of tasksData) {
-        const [taskResponsibilities, allocations] = await Promise.all([
-          fetchResponsibilities(task.id),
-          fetchTaskAllocations(task.id),
-        ]);
-        responsibilitiesData[task.id] = taskResponsibilities;
+        const allocations = await fetchTaskAllocations(task.id);
+        console.log(
+          `Fetched ${allocations.length} allocations for task ${task.id}:`,
+          allocations
+        );
         allocationsData[task.id] = allocations;
       }
 
-      setResponsibilities(responsibilitiesData);
+      // Update both states at once to ensure consistent UI
+      console.log("Updating tasks and allocations state with:", {
+        tasks: tasksData,
+        allocations: allocationsData,
+      });
+      setTasks(tasksData);
       setTaskAllocations(allocationsData);
+
+      // Force a re-render by updating a dummy state
+      setForceUpdate((prev) => prev + 1);
     } catch (error) {
       console.error("Error loading tasks:", error);
       toast({
@@ -180,33 +220,48 @@ export default function TasksView({
   const loadTasksForGroup = async (groupId: string) => {
     setLoading(true);
     try {
-      const tasksData = await Promise.all(
-        categories
-          .filter((cat) => cat.groupId === groupId)
-          .map((cat) => fetchTasksByCategory(cat.id))
-      );
-      setTasks(tasksData.flat());
+      console.log(`Loading tasks for group: ${groupId}`);
 
-      // Load responsibilities and allocations for each task
-      const responsibilitiesData: Record<string, Responsibility[]> = {};
+      // Get all categories in the selected group
+      const groupCategories = categories.filter(
+        (cat) => cat.groupId === groupId
+      );
+
+      // Load tasks for all categories in the group
+      const tasksData = await Promise.all(
+        groupCategories.map((cat) => fetchTasksByCategory(cat.id))
+      );
+      const allTasks = tasksData.flat();
+
+      console.log(`Fetched ${allTasks.length} tasks for group:`, allTasks);
+
+      // Load allocations for each task
       const allocationsData: Record<string, TaskAllocation[]> = {};
 
-      for (const task of tasksData.flat()) {
-        const [taskResponsibilities, allocations] = await Promise.all([
-          fetchResponsibilities(task.id),
-          fetchTaskAllocations(task.id),
-        ]);
-        responsibilitiesData[task.id] = taskResponsibilities;
+      for (const task of allTasks) {
+        const allocations = await fetchTaskAllocations(task.id);
+        console.log(
+          `Fetched ${allocations.length} allocations for task ${task.id}:`,
+          allocations
+        );
         allocationsData[task.id] = allocations;
       }
 
-      setResponsibilities(responsibilitiesData);
+      // Update both states at once to ensure consistent UI
+      console.log("Updating tasks and allocations state with:", {
+        tasks: allTasks,
+        allocations: allocationsData,
+      });
+      setTasks(allTasks);
       setTaskAllocations(allocationsData);
+
+      // Force a re-render by updating a dummy state
+      setForceUpdate((prev) => prev + 1);
     } catch (error) {
-      console.error("Error loading tasks:", error);
+      console.error("Error loading tasks for group:", error);
       toast({
         title: "Error",
-        description: "Failed to load tasks. Please try again.",
+        description: "Failed to load tasks for group. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -216,15 +271,11 @@ export default function TasksView({
 
   const loadAvailablePeople = async (categoryId: string) => {
     try {
-      const people = await getPeopleAllocatedToCategory(categoryId);
-      setAvailablePeople(people);
+      const peopleData = await getPeopleAllocatedToCategory(categoryId);
+      setAvailablePeople(peopleData);
     } catch (error) {
       console.error("Error loading available people:", error);
     }
-  };
-
-  const handleRefreshTasks = async () => {
-    await loadTasksForCategory(selectedCategoryId);
   };
 
   // Task CRUD operations
@@ -232,14 +283,21 @@ export default function TasksView({
     try {
       const newTask = await createTask(taskData);
       if (newTask) {
-        await loadTasksForCategory(selectedCategoryId);
+        setTasks([...tasks, newTask]);
+        setTaskAllocations({
+          ...taskAllocations,
+          [newTask.id]: [],
+        });
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange();
+
         toast({
-          title: "Success",
-          description: "Task created successfully.",
+          title: "Task created",
+          description: `Task "${newTask.name}" has been created.`,
         });
       }
     } catch (error) {
-      console.error("Error creating task:", error);
       toast({
         title: "Error",
         description: "Failed to create task. Please try again.",
@@ -250,41 +308,113 @@ export default function TasksView({
 
   const handleTaskSave = async (
     taskData: Omit<Task, "id" | "createdAt">,
-    sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]
+    allocatedPeople: string[]
   ) => {
     try {
       if (editingTask) {
-        const updatedTask = await updateTask({ ...editingTask, ...taskData });
+        // Update existing task
+        console.log("Updating existing task:", { ...editingTask, ...taskData });
+        const updatedTask = await updateTask({
+          ...editingTask,
+          ...taskData,
+        });
+
         if (updatedTask) {
-          await loadTasksForCategory(selectedCategoryId);
+          console.log("Task updated successfully:", updatedTask);
+
+          // Update task allocations and wait for it to complete
+          const updatedAllocations = await updateTaskAllocations(
+            updatedTask.id,
+            allocatedPeople
+          );
+          console.log("Updated allocations:", updatedAllocations);
+
+          // Update local state immediately
+          setTasks((prevTasks) => {
+            const newTasks = prevTasks.map((task) =>
+              task.id === updatedTask.id ? updatedTask : task
+            );
+            console.log("Updated tasks state:", newTasks);
+            return newTasks;
+          });
+
+          setTaskAllocations((prev) => {
+            const newAllocations = {
+              ...prev,
+              [updatedTask.id]: updatedAllocations,
+            };
+            console.log("Updated allocations state:", newAllocations);
+            return newAllocations;
+          });
+
+          // Force a re-render
+          setForceUpdate((prev) => prev + 1);
+
+          // Also refresh from database to ensure everything is in sync
+          await loadTasksForCategory(
+            selectedCategoryId === "all" ? undefined : selectedCategoryId
+          );
+
+          // Notify parent component to refresh data
+          if (onDataChange) onDataChange();
+
           toast({
             title: "Success",
-            description: "Task updated successfully.",
+            description: "Task updated successfully",
           });
         }
       } else {
         // Create new task
+        console.log("Creating new task:", taskData);
         const newTask = await createTask(taskData);
-        if (newTask && sourceLinks && sourceLinks.length > 0) {
-          // Create source links for the new task
-          for (const linkData of sourceLinks) {
-            await createTaskSourceLink({
-              taskId: newTask.id,
-              url: linkData.url,
-              description: linkData.description,
-            });
-          }
-        }
+
         if (newTask) {
-          await loadTasksForCategory(selectedCategoryId);
+          console.log("New task created:", newTask);
+
+          // Create task allocations and wait for it to complete
+          const newAllocations = await updateTaskAllocations(
+            newTask.id,
+            allocatedPeople
+          );
+          console.log("New allocations created:", newAllocations);
+
+          // Update local state immediately
+          setTasks((prevTasks) => {
+            const newTasks = [...prevTasks, newTask];
+            console.log("Updated tasks state with new task:", newTasks);
+            return newTasks;
+          });
+
+          setTaskAllocations((prev) => {
+            const newAllocationState = {
+              ...prev,
+              [newTask.id]: newAllocations,
+            };
+            console.log(
+              "Updated allocations state with new allocations:",
+              newAllocationState
+            );
+            return newAllocationState;
+          });
+
+          // Force a re-render
+          setForceUpdate((prev) => prev + 1);
+
+          // Also refresh from database to ensure everything is in sync
+          await loadTasksForCategory(
+            selectedCategoryId === "all" ? undefined : selectedCategoryId
+          );
+          console.log("Tasks reloaded after creation");
+
+          // Notify parent component to refresh data
+          if (onDataChange) onDataChange();
+
           toast({
             title: "Success",
-            description: "Task created successfully.",
+            description: "Task created successfully",
           });
         }
       }
-      setTaskDialogOpen(false);
-      setEditingTask(undefined);
     } catch (error) {
       console.error("Error saving task:", error);
       toast({
@@ -292,6 +422,102 @@ export default function TasksView({
         description: "Failed to save task. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setEditingTask(undefined);
+    }
+  };
+
+  const updateTaskAllocations = async (
+    taskId: string,
+    allocatedPeople: string[]
+  ): Promise<TaskAllocation[]> => {
+    try {
+      console.log(
+        `Updating allocations for task ${taskId}. People to allocate:`,
+        allocatedPeople
+      );
+
+      // Fetch the latest allocations directly from the database to ensure we have the most up-to-date data
+      const latestAllocations = await fetchTaskAllocations(taskId);
+      console.log(
+        `Current allocations from DB for task ${taskId}:`,
+        latestAllocations
+      );
+
+      const currentPersonIds = latestAllocations.map((a) => a.personId);
+
+      // Find people to add and remove
+      const peopleToAdd = allocatedPeople.filter(
+        (personId) => !currentPersonIds.includes(personId)
+      );
+      const peopleToRemove = currentPersonIds.filter(
+        (personId) => !allocatedPeople.includes(personId)
+      );
+
+      console.log(
+        `People to add: ${peopleToAdd.length}, People to remove: ${peopleToRemove.length}`
+      );
+
+      // Remove old allocations
+      for (const personId of peopleToRemove) {
+        const allocation = latestAllocations.find(
+          (a) => a.personId === personId
+        );
+        if (allocation) {
+          console.log(
+            `Removing allocation for person ${personId} from task ${taskId}`
+          );
+          const success = await deleteTaskAllocation(allocation.id);
+          console.log(`Deletion success: ${success}`);
+        }
+      }
+
+      // Add new allocations
+      const newAllocations: TaskAllocation[] = [];
+      for (const personId of peopleToAdd) {
+        console.log(
+          `Adding allocation for person ${personId} to task ${taskId}`
+        );
+        const newAllocation = await createTaskAllocation({
+          taskId,
+          personId,
+          estimatedWeeklyHours: 0, // Default to 0, can be updated later if needed
+          isLead: false,
+        });
+
+        if (newAllocation) {
+          console.log(`Successfully added allocation:`, newAllocation);
+          newAllocations.push(newAllocation);
+        } else {
+          console.error(
+            `Failed to add allocation for person ${personId} to task ${taskId}`
+          );
+        }
+      }
+
+      // Fetch the final allocations from the database to ensure we have the complete and correct list
+      const finalAllocations = await fetchTaskAllocations(taskId);
+      console.log(
+        `Final allocations for task ${taskId} after updates:`,
+        finalAllocations
+      );
+
+      // Update local state
+      setTaskAllocations((prev) => ({
+        ...prev,
+        [taskId]: finalAllocations,
+      }));
+
+      return finalAllocations;
+    } catch (error) {
+      console.error("Error updating task allocations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update task allocations.",
+        variant: "destructive",
+      });
+      // Return empty array in case of error
+      return [];
     }
   };
 
@@ -299,110 +525,25 @@ export default function TasksView({
     try {
       const success = await deleteTask(taskId);
       if (success) {
-        await loadTasksForCategory(selectedCategoryId);
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        setTaskAllocations((prev) => {
+          const newAllocations = { ...prev };
+          delete newAllocations[taskId];
+          return newAllocations;
+        });
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange();
+
         toast({
-          title: "Success",
-          description: "Task deleted successfully.",
+          title: "Task deleted",
+          description: "Task has been deleted.",
         });
       }
     } catch (error) {
-      console.error("Error deleting task:", error);
       toast({
         title: "Error",
         description: "Failed to delete task. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Responsibility operations
-  const handleCreateResponsibility = async (
-    responsibilityData: Omit<Responsibility, "id" | "createdAt">
-  ) => {
-    try {
-      const newResponsibility = await createResponsibility(responsibilityData);
-      if (newResponsibility && selectedTask) {
-        const taskResponsibilities = await fetchResponsibilities(
-          selectedTask.id
-        );
-        setResponsibilities((prev) => ({
-          ...prev,
-          [selectedTask.id]: taskResponsibilities,
-        }));
-        toast({
-          title: "Success",
-          description: "Responsibility created successfully.",
-        });
-      }
-    } catch (error) {
-      console.error("Error creating responsibility:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create responsibility. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleResponsibilitySave = async (
-    responsibilityData: Omit<Responsibility, "id" | "createdAt">
-  ) => {
-    try {
-      if (editingResponsibility) {
-        const updatedResponsibility = await updateResponsibility({
-          ...editingResponsibility,
-          ...responsibilityData,
-        });
-        if (updatedResponsibility && selectedTask) {
-          const taskResponsibilities = await fetchResponsibilities(
-            selectedTask.id
-          );
-          setResponsibilities((prev) => ({
-            ...prev,
-            [selectedTask.id]: taskResponsibilities,
-          }));
-          toast({
-            title: "Success",
-            description: "Responsibility updated successfully.",
-          });
-        }
-      } else {
-        await handleCreateResponsibility(responsibilityData);
-      }
-      setResponsibilityDialogOpen(false);
-      setEditingResponsibility(undefined);
-    } catch (error) {
-      console.error("Error saving responsibility:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save responsibility. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteResponsibility = async (
-    responsibilityId: string,
-    taskId: string
-  ) => {
-    try {
-      const success = await deleteResponsibility(responsibilityId);
-      if (success) {
-        const taskResponsibilities = await fetchResponsibilities(taskId);
-        setResponsibilities((prev) => ({
-          ...prev,
-          [taskId]: taskResponsibilities,
-        }));
-        toast({
-          title: "Success",
-          description: "Responsibility deleted successfully.",
-        });
-      }
-    } catch (error) {
-      console.error("Error deleting responsibility:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete responsibility. Please try again.",
         variant: "destructive",
       });
     }
@@ -414,21 +555,26 @@ export default function TasksView({
   ) => {
     try {
       const newAllocation = await createTaskAllocation(allocationData);
-      if (newAllocation && selectedTask) {
-        const allocations = await fetchTaskAllocations(selectedTask.id);
+      if (newAllocation) {
         setTaskAllocations((prev) => ({
           ...prev,
-          [selectedTask.id]: allocations,
+          [allocationData.taskId]: [
+            ...(prev[allocationData.taskId] || []),
+            newAllocation,
+          ],
         }));
+
+        // Notify parent component to refresh data
+        if (onDataChange) onDataChange();
+
         toast({
-          title: "Success",
-          description: "Task allocation created successfully.",
+          title: "Person allocated",
+          description: `${getPersonName(
+            newAllocation.personId
+          )} has been allocated to the task.`,
         });
       }
-      setTaskAllocationDialogOpen(false);
-      setEditingResponsibility(undefined);
     } catch (error) {
-      console.error("Error creating task allocation:", error);
       toast({
         title: "Error",
         description: "Failed to create task allocation. Please try again.",
@@ -444,10 +590,9 @@ export default function TasksView({
     try {
       const success = await deleteTaskAllocation(allocationId);
       if (success) {
-        const allocations = await fetchTaskAllocations(taskId);
         setTaskAllocations((prev) => ({
           ...prev,
-          [taskId]: allocations,
+          [taskId]: (prev[taskId] || []).filter((a) => a.id !== allocationId),
         }));
         toast({
           title: "Success",
@@ -455,7 +600,6 @@ export default function TasksView({
         });
       }
     } catch (error) {
-      console.error("Error deleting task allocation:", error);
       toast({
         title: "Error",
         description: "Failed to delete task allocation. Please try again.",
@@ -466,518 +610,518 @@ export default function TasksView({
 
   // Helper functions
   const getPersonName = (personId: string) => {
-    const person = people.find((p) => p.id === personId);
-    return person ? person.name : "Unknown";
+    const person =
+      people.find((p) => p.id === personId) ||
+      availablePeople.find((p) => p.id === personId);
+    return person?.name || "Unknown";
+  };
+
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    return category?.name || "Unknown";
+  };
+
+  // Helper: sort tasks
+  const sortTasks = (tasks: Task[]) => {
+    return [...tasks].sort((a, b) => {
+      switch (sortOption) {
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "created-asc":
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        case "created-desc":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        case "hours-asc":
+          return a.hoursPerWeek - b.hoursPerWeek;
+        case "hours-desc":
+          return b.hoursPerWeek - a.hoursPerWeek;
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Filter tasks by category and person
+  const filterTasksByCategory = (tasks: Task[]) => {
+    if (categoryFilter === "all") return tasks;
+    return tasks.filter((task) => task.categoryId === categoryFilter);
+  };
+
+  const filterTasksByPerson = (tasks: Task[]) => {
+    if (personFilter === "all") return tasks;
+
+    return tasks.filter((task) => {
+      const allocations = taskAllocations[task.id] || [];
+      return allocations.some(
+        (allocation) => allocation.personId === personFilter
+      );
+    });
+  };
+
+  const filteredTasks = filterTasksByPerson(filterTasksByCategory(tasks));
+  const sortedTasks = sortTasks(filteredTasks);
+
+  // Group tasks by their group (via category)
+  const groupedTasks = sortedTasks.reduce((acc, task) => {
+    const category = categories.find((cat) => cat.id === task.categoryId);
+    const group = groups.find((grp) => grp.id === category?.groupId);
+    const groupName = group?.name || "Unknown Group";
+    const groupId = group?.id || "unknown";
+
+    if (!acc[groupId]) {
+      acc[groupId] = {
+        groupName,
+        tasks: [],
+      };
+    }
+    acc[groupId].tasks.push(task);
+    return acc;
+  }, {} as Record<string, { groupName: string; tasks: Task[] }>);
+
+  // Sort groups by name
+  const sortedGroups = Object.entries(groupedTasks).sort(([, a], [, b]) =>
+    a.groupName.localeCompare(b.groupName)
+  );
+
+  const handleSort = (field: string) => {
+    let newSortOption: SortOption;
+
+    if (field === "name") {
+      newSortOption = sortOption === "name-asc" ? "name-desc" : "name-asc";
+    } else if (field === "hours") {
+      newSortOption = sortOption === "hours-asc" ? "hours-desc" : "hours-asc";
+    } else if (field === "created") {
+      newSortOption =
+        sortOption === "created-asc" ? "created-desc" : "created-asc";
+    } else {
+      return;
+    }
+
+    setSortOption(newSortOption);
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    let isActive = false;
+    let isAsc = true;
+
+    if (field === "name") {
+      isActive = sortOption.startsWith("name");
+      isAsc = sortOption === "name-asc";
+    } else if (field === "hours") {
+      isActive = sortOption.startsWith("hours");
+      isAsc = sortOption === "hours-asc";
+    } else if (field === "created") {
+      isActive = sortOption.startsWith("created");
+      isAsc = sortOption === "created-asc";
+    }
+
+    if (!isActive) return null;
+    return isAsc ? (
+      <ChevronUp className="h-4 w-4 inline ml-1" />
+    ) : (
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSelectedGroupId("all");
+    setSelectedCategoryId("all");
+    setCategoryFilter("all");
+    setPersonFilter("all");
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Tasks</h2>
-          <p className="text-muted-foreground">
-            Manage tasks and responsibilities for your categories
-          </p>
-        </div>
-      </div>
-
-      {/* Group and Category Selection */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a group (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              {groups
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex-1">
-          <Select
-            value={selectedCategoryId}
-            onValueChange={setSelectedCategoryId}
+    <div className="flex flex-col h-full w-full">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
+            Tasks & Responsibilities
+          </h2>
+          <Button
+            variant="outline"
+            onClick={() => setWorkflowToolsDialogOpen(true)}
+            className="flex items-center gap-2"
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {selectedGroupId
-                ? // Show categories for selected group
-                  filteredCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
+            <Wrench className="h-4 w-4" />
+            Workflow Tools
+          </Button>
+        </div>
+
+        {/* Selection Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Group
+            </label>
+            <Select
+              value={selectedGroupId}
+              onValueChange={(value) => {
+                setSelectedGroupId(value);
+                // When a group is selected, reset category to "all" to enable group filtering
+                if (value && value !== "all" && selectedCategoryId !== "all") {
+                  setSelectedCategoryId("all");
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a group" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Groups</SelectItem>
+                {groups
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name}
                     </SelectItem>
-                  ))
-                : // Show all categories when no group is selected
-                  allCategories.map((category) => (
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category
+            </label>
+            <Select
+              value={selectedCategoryId}
+              onValueChange={setSelectedCategoryId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {filteredCategories
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
                   ))}
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedCategoryId && (
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Filter by Person
+              </label>
+              <Select value={personFilter} onValueChange={setPersonFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All People" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All People</SelectItem>
+                  {people
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.name} ({person.organisation})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-2">
-          {selectedCategoryId && selectedCategoryId !== "all" && isAdmin && (
-            <Button onClick={() => setTaskDialogOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
+        {/* Add Task Button */}
+        <div className="flex gap-2 mb-2">
+          {selectedCategoryId && selectedCategoryId !== "all" && (
+            <Button
+              onClick={() => {
+                setEditingTask(undefined);
+                setTaskDialogOpen(true);
+              }}
+              className="mb-2"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
               Add Task
             </Button>
           )}
-          {selectedCategoryId && selectedCategoryId !== "all" && (
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setSelectedCategoryId("all");
-                setSelectedGroupId("");
-              }}
-            >
-              Clear Filter
-            </Button>
-          )}
-          <Button onClick={handleRefreshTasks}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button
+            onClick={() =>
+              loadTasksForCategory(
+                selectedCategoryId === "all" ? undefined : selectedCategoryId
+              )
+            }
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
+          </Button>
+          <Button variant="outline" onClick={clearAllFilters}>
+            Clear Filters
           </Button>
         </div>
       </div>
 
-      {/* Tasks List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-600">Loading tasks...</p>
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500">
-              No tasks found for the selected category.
+      {/* Content */}
+      <div className="flex-1 overflow-auto bg-gray-50 w-full">
+        {!selectedCategoryId ? (
+          <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300 m-4">
+            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-2">
+              Select a category to view tasks
             </p>
-            {selectedCategoryId && selectedCategoryId !== "all" && (
-              <Button className="mt-4" onClick={() => setTaskDialogOpen(true)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create First Task
-              </Button>
-            )}
+            <p className="text-sm text-gray-400">
+              Choose from the dropdown above to get started
+            </p>
+          </div>
+        ) : loading ? (
+          <div className="text-center py-12 m-4">
+            <p className="text-gray-500">Loading tasks...</p>
           </div>
         ) : (
-          <ScrollArea className="h-[600px]">
-            <div className="space-y-4">
-              {tasks.map((task) => {
-                const taskResponsibilities = responsibilities[task.id] || [];
-                const allocations = taskAllocations[task.id] || [];
-                const totalWeeklyHours = taskResponsibilities.reduce(
-                  (sum, resp) => sum + resp.estimatedWeeklyHours,
-                  0
-                );
-
-                return (
-                  <Card key={task.id} className="w-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1 flex-1">
-                          <CardTitle className="text-xl">{task.name}</CardTitle>
-                          <CardDescription>{task.description}</CardDescription>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <ClockIcon className="h-4 w-4" />
-                              <span>{task.hoursPerWeek}h/week</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Workflow className="h-4 w-4" />
-                              <span>
-                                {taskResponsibilities.length} responsibilities
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <UsersIcon className="h-4 w-4" />
-                              <span>{allocations.length} allocated</span>
-                            </div>
-                            {totalWeeklyHours > 0 && (
-                              <div className="flex items-center gap-1">
-                                <AlertCircle className="h-4 w-4" />
-                                <span>{totalWeeklyHours}h total estimated</span>
+          <div className="p-4">
+            <div className="bg-white border border-gray-200 rounded-lg">
+              <div className="overflow-auto max-h-[calc(100vh-300px)]">
+                <table className="min-w-full w-full">
+                  <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-50 shadow-lg">
+                    <tr>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort("name")}
+                      >
+                        Task Name
+                        <SortIcon field="name" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        onClick={() => handleSort("description")}
+                      >
+                        Description
+                        <SortIcon field="description" />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700">
+                        Category
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700">
+                        Hours/Week
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700">
+                        Source
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700">
+                        Assigned To
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider bg-gray-100 dark:bg-gray-700">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedGroups.map(
+                      ([groupId, { groupName, tasks: groupTasks }]) => (
+                        <React.Fragment key={`group-fragment-${groupId}`}>
+                          {/* Group Divider Row */}
+                          <tr
+                            key={`group-${groupId}`}
+                            className="bg-gray-100 dark:bg-gray-800"
+                          >
+                            <td
+                              colSpan={7}
+                              className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200 border-t-2 border-gray-300 dark:border-gray-600"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Layers className="h-4 w-4" />
+                                {groupName} ({groupTasks.length} task
+                                {groupTasks.length !== 1 ? "s" : ""})
                               </div>
-                            )}
-                            {task.sourceLinks &&
-                              task.sourceLinks.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                  <ExternalLink className="h-4 w-4" />
-                                  <span className="text-sm text-gray-600">
-                                    {task.sourceLinks.length} source
-                                    {task.sourceLinks.length > 1 ? "s" : ""}
-                                  </span>
-                                </div>
-                              )}
-                          </div>
-                        </div>
+                            </td>
+                          </tr>
+                          {/* Tasks for this group */}
+                          {groupTasks.map((task) => {
+                            const allocations = taskAllocations[task.id] || [];
+                            const category = categories.find(
+                              (cat) => cat.id === task.categoryId
+                            );
 
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTask(task);
-                              setEditingTask(task);
-                              setTaskDialogOpen(true);
-                            }}
-                          >
-                            <EditIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteTask(task.id)}
-                          >
-                            <Trash2Icon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setWorkflowTask(task);
-                              setWorkflowDialogOpen(true);
-                            }}
-                          >
-                            <Workflow className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setWorkflowToolsDialogOpen(true)}
-                          >
-                            <Wrench className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
+                            // Get organization color for a person
+                            const getOrgColor = (personId: string) => {
+                              const person =
+                                people.find((p) => p.id === personId) ||
+                                availablePeople.find((p) => p.id === personId);
+                              if (!person) return "#6B7280"; // gray fallback
 
-                    <CardContent className="space-y-6">
-                      {/* Task Allocations */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">
-                            Task Allocations
-                          </h4>
-                          {selectedCategoryId &&
-                            selectedCategoryId !== "all" &&
-                            isAdmin && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setTaskAllocationDialogOpen(true);
-                                }}
+                              // Map organization names to colors
+                              const orgColors = {
+                                PDNSW: "#3B82F6", // Blue
+                                WSP: "#EF4444", // Red
+                                Giraffe: "#F59E0B", // Orange
+                              };
+                              return (
+                                orgColors[
+                                  person.organisation as keyof typeof orgColors
+                                ] || "#6B7280"
+                              );
+                            };
+
+                            return (
+                              <tr
+                                key={task.id}
+                                className="border-b hover:bg-gray-50"
                               >
-                                <Plus className="mr-1 h-3 w-3" />
-                                Add Person
-                              </Button>
-                            )}
-                        </div>
-
-                        {allocations.length > 0 ? (
-                          <div className="space-y-2">
-                            {allocations.map((allocation) => (
-                              <div
-                                key={allocation.id}
-                                className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <User className="h-4 w-4" />
-                                  <span className="text-sm">
-                                    {getPersonName(allocation.personId)}
-                                  </span>
-                                  {(() => {
-                                    const person = people.find(
-                                      (p) => p.id === allocation.personId
-                                    );
-                                    return person &&
-                                      getOrganizationLogo(
-                                        person.organisation
-                                      ) ? (
-                                      <Image
-                                        src={getOrganizationLogo(
-                                          person.organisation
-                                        )}
-                                        alt={`${person.organisation} logo`}
-                                        width={12}
-                                        height={12}
-                                        className="flex-shrink-0"
-                                      />
-                                    ) : null;
-                                  })()}
-                                  {allocation.isLead && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
-                                      Lead
-                                    </Badge>
-                                  )}
-                                  {allocation.estimatedWeeklyHours > 0 && (
-                                    <span className="text-xs text-gray-500">
-                                      ({allocation.estimatedWeeklyHours}h/week)
-                                    </span>
-                                  )}
-                                </div>
-
-                                {selectedCategoryId &&
-                                  selectedCategoryId !== "all" &&
-                                  isAdmin && (
+                                <td className="px-4 py-2 font-medium">
+                                  {task.name}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {task.description}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {category ? category.name : "-"}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {task.hoursPerWeek}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {task.sourceLinks &&
+                                  task.sourceLinks.length > 0 ? (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() =>
-                                        handleDeleteTaskAllocation(
-                                          allocation.id,
-                                          task.id
+                                        window.open(
+                                          task.sourceLinks![0].url,
+                                          "_blank"
                                         )
                                       }
+                                      className="p-1 h-auto"
+                                      title="View source material"
                                     >
-                                      <Trash2Icon className="h-4 w-4" />
+                                      <ExternalLinkIcon className="h-4 w-4" />
                                     </Button>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">
+                                      -
+                                    </span>
                                   )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">
-                            No people allocated yet
-                          </p>
-                        )}
-                      </div>
-
-                      <Separator />
-
-                      {/* Source Links */}
-                      {task.sourceLinks && task.sourceLinks.length > 0 && (
-                        <>
-                          <div className="space-y-3">
-                            <h4 className="text-sm font-medium">
-                              Source Links
-                            </h4>
-                            <div className="space-y-2">
-                              {task.sourceLinks.map((link) => (
-                                <div
-                                  key={link.id}
-                                  className="flex items-center gap-2 p-2 bg-gray-50 rounded"
-                                >
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      window.open(link.url, "_blank")
-                                    }
-                                    className="h-auto p-0 text-blue-600 hover:text-blue-800"
-                                  >
-                                    <ExternalLink className="h-4 w-4 mr-1" />
-                                  </Button>
-                                  <div className="flex-1 min-w-0">
-                                    <a
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate block"
-                                      title={link.url}
-                                    >
-                                      {link.url}
-                                    </a>
-                                    {link.description && (
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        {link.description}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <Separator />
-                        </>
-                      )}
-
-                      {/* Responsibilities */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">
-                            Responsibilities
-                          </h4>
-                          {selectedCategoryId &&
-                            selectedCategoryId !== "all" &&
-                            isAdmin && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setEditingResponsibility(undefined);
-                                  setResponsibilityDialogOpen(true);
-                                }}
-                              >
-                                <Plus className="mr-1 h-3 w-3" />
-                                Add Responsibility
-                              </Button>
-                            )}
-                        </div>
-
-                        {taskResponsibilities.length > 0 ? (
-                          <div className="space-y-3">
-                            {taskResponsibilities.map((responsibility) => (
-                              <div
-                                key={responsibility.id}
-                                className="flex items-start justify-between p-3 border rounded-lg"
-                              >
-                                <div className="flex-1">
-                                  <div className="flex items-start gap-2">
-                                    <Circle className="h-4 w-4 mt-0.5 text-gray-400" />
-                                    <div className="flex-1">
-                                      <p className="font-medium">
-                                        {responsibility.description}
-                                      </p>
-                                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                                        {responsibility.assignedPersonId && (
-                                          <span className="flex items-center gap-1">
-                                            <span>
-                                              Assigned:{" "}
-                                              {getPersonName(
-                                                responsibility.assignedPersonId
-                                              )}
-                                            </span>
-                                            {(() => {
-                                              const person = people.find(
-                                                (p) =>
-                                                  p.id ===
-                                                  responsibility.assignedPersonId
-                                              );
-                                              return person &&
-                                                getOrganizationLogo(
-                                                  person.organisation
-                                                ) ? (
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-wrap gap-1">
+                                    {allocations.length > 0 ? (
+                                      allocations.map((allocation) => {
+                                        const personName = getPersonName(
+                                          allocation.personId
+                                        );
+                                        const orgColor = getOrgColor(
+                                          allocation.personId
+                                        );
+                                        const person =
+                                          people.find(
+                                            (p) => p.id === allocation.personId
+                                          ) ||
+                                          availablePeople.find(
+                                            (p) => p.id === allocation.personId
+                                          );
+                                        return (
+                                          <span
+                                            key={allocation.id}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-black bg-transparent border-2"
+                                            style={{ borderColor: orgColor }}
+                                          >
+                                            <span>{personName}</span>
+                                            {person &&
+                                              getOrganizationLogo(
+                                                person.organisation
+                                              ) && (
                                                 <Image
                                                   src={getOrganizationLogo(
                                                     person.organisation
                                                   )}
                                                   alt={`${person.organisation} logo`}
-                                                  width={10}
-                                                  height={10}
+                                                  width={12}
+                                                  height={12}
                                                   className="flex-shrink-0"
                                                 />
-                                              ) : null;
-                                            })()}
+                                              )}
                                           </span>
-                                        )}
-                                        {responsibility.estimatedWeeklyHours >
-                                          0 && (
-                                          <span>
-                                            Est:{" "}
-                                            {
-                                              responsibility.estimatedWeeklyHours
-                                            }
-                                            h/week
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <span className="text-gray-400 text-sm">
+                                        Unassigned
+                                      </span>
+                                    )}
                                   </div>
-                                </div>
-
-                                {selectedCategoryId &&
-                                  selectedCategoryId !== "all" &&
-                                  isAdmin && (
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedTask(task);
-                                          setEditingResponsibility(
-                                            responsibility
-                                          );
-                                          setResponsibilityDialogOpen(true);
-                                        }}
-                                      >
-                                        <EditIcon className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleDeleteResponsibility(
-                                            responsibility.id,
-                                            task.id
-                                          )
-                                        }
-                                      >
-                                        <Trash2Icon className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">
-                            No responsibilities defined yet
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingTask(task);
+                                        setTaskDialogOpen(true);
+                                      }}
+                                    >
+                                      <EditIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteTask(task.id)}
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setWorkflowTask(task);
+                                        setWorkflowDialogOpen(true);
+                                      }}
+                                    >
+                                      <Workflow className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
 
       {/* Dialogs */}
-      <TaskDialog
+      <SimpleTaskDialog
         open={taskDialogOpen}
         onOpenChange={setTaskDialogOpen}
         onSave={handleTaskSave}
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         task={editingTask}
+        availablePeople={people}
+        existingAllocations={
+          editingTask ? taskAllocations[editingTask.id] || [] : []
+        }
       />
 
-      {selectedCategoryId && selectedCategoryId !== "all" && (
-        <>
-          {selectedTask && (
-            <>
-              <ResponsibilityDialog
-                open={responsibilityDialogOpen}
-                onOpenChange={setResponsibilityDialogOpen}
-                onSave={handleResponsibilitySave}
-                availablePeople={availablePeople}
-                taskId={selectedTask.id}
-                responsibility={editingResponsibility}
-              />
-
-              <TaskAllocationDialog
-                open={taskAllocationDialogOpen}
-                onOpenChange={setTaskAllocationDialogOpen}
-                onSave={handleCreateTaskAllocation}
-                availablePeople={availablePeople}
-                taskId={selectedTask.id}
-                allocation={undefined}
-              />
-            </>
-          )}
-        </>
+      {selectedTask && (
+        <TaskAllocationDialog
+          open={allocationDialogOpen}
+          onOpenChange={setAllocationDialogOpen}
+          onSave={handleCreateTaskAllocation}
+          availablePeople={availablePeople}
+          taskId={selectedTask.id}
+          allocation={editingAllocation}
+        />
       )}
-
       {workflowTask && (
         <WorkflowDialog
           open={workflowDialogOpen}

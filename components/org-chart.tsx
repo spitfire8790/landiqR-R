@@ -297,7 +297,7 @@ export default function OrgChart({
     if (categories.length > 0) {
       loadAllTasksAndAllocations();
     }
-  }, [categories]);
+  }, [categories.length]); // Only depend on categories.length to prevent frequent re-renders
 
   // Set up DnD sensors
   const sensors = useSensors(

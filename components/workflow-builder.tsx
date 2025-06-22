@@ -50,7 +50,7 @@ import {
   FileText,
   StickyNote,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import type { Person, WorkflowTool, Workflow, WorkflowData } from "@/lib/types";
 import Image from "next/image";
 import * as LucideIcons from "lucide-react";
@@ -703,13 +703,13 @@ export function WorkflowBuilder({
     }
   };
 
-  // Add solid grey styling to all edges
+  // Add animated blue dashed styling to all edges
   const animatedEdges = edges.map((edge) => ({
     ...edge,
-    animated: false,
+    animated: true,
     style: {
-      strokeDasharray: "0,0", // Solid line
-      stroke: edge.selected ? "#ef4444" : "#6b7280", // Red when selected, grey otherwise
+      strokeDasharray: "5,5", // Dashed line
+      stroke: edge.selected ? "#ef4444" : "#3b82f6", // Red when selected, blue otherwise
       strokeWidth: edge.selected ? 3 : 2, // Thicker when selected
     },
     type: "smoothstep",

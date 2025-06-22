@@ -25,7 +25,7 @@ import { Search, Eye, Edit, Trash2, Plus, GitBranch } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Workflow, Task, Category, Group } from "@/lib/types";
 import { fetchWorkflows, fetchTasks, deleteWorkflow } from "@/lib/data-service";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface WorkflowsTableProps {
   groups: Group[];
@@ -81,12 +81,14 @@ export default function WorkflowsTable({
 
   // Filter workflows based on search term, task, and status
   const filteredWorkflows = workflows.filter((workflow) => {
-    const matchesSearch = workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       workflow.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesTask = taskFilter === "all" || workflow.taskId === taskFilter;
-    
-    const matchesStatus = statusFilter === "all" || 
+
+    const matchesStatus =
+      statusFilter === "all" ||
       (statusFilter === "active" && workflow.isActive) ||
       (statusFilter === "inactive" && !workflow.isActive);
 
@@ -95,11 +97,11 @@ export default function WorkflowsTable({
 
   const handleDelete = async (id: string) => {
     if (!isAdmin) return;
-    
+
     try {
       const success = await deleteWorkflow(id);
       if (success) {
-        setWorkflows(workflows.filter(w => w.id !== id));
+        setWorkflows(workflows.filter((w) => w.id !== id));
         toast({
           title: "Success",
           description: "Workflow deleted successfully",
@@ -117,23 +119,23 @@ export default function WorkflowsTable({
   };
 
   const getTaskName = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     return task?.name || "Unknown Task";
   };
 
   const getCategoryName = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return "Unknown Category";
-    const category = categories.find(c => c.id === task.categoryId);
+    const category = categories.find((c) => c.id === task.categoryId);
     return category?.name || "Unknown Category";
   };
 
   const getGroupName = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return "Unknown Group";
-    const category = categories.find(c => c.id === task.categoryId);
+    const category = categories.find((c) => c.id === task.categoryId);
     if (!category) return "Unknown Group";
-    const group = groups.find(g => g.id === category.groupId);
+    const group = groups.find((g) => g.id === category.groupId);
     return group?.name || "Unknown Group";
   };
 
@@ -245,10 +247,9 @@ export default function WorkflowsTable({
                       <div className="text-center">
                         <GitBranch className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                         <p className="text-gray-500">
-                          {workflows.length === 0 
+                          {workflows.length === 0
                             ? "No workflows found. Create your first workflow to get started."
-                            : "No workflows match your current filters."
-                          }
+                            : "No workflows match your current filters."}
                         </p>
                       </div>
                     </TableCell>
@@ -274,9 +275,13 @@ export default function WorkflowsTable({
                       <TableCell>{getCategoryName(workflow.taskId)}</TableCell>
                       <TableCell>{getGroupName(workflow.taskId)}</TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={workflow.isActive ? "default" : "secondary"}
-                          className={workflow.isActive ? "bg-green-100 text-green-800" : ""}
+                          className={
+                            workflow.isActive
+                              ? "bg-green-100 text-green-800"
+                              : ""
+                          }
                         >
                           {workflow.isActive ? "Active" : "Inactive"}
                         </Badge>

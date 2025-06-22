@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   PlusCircle,
   Layers,
   Users,
@@ -17,6 +23,8 @@ import {
   CheckSquare,
   MessageCircle,
   GitBranch,
+  Calendar,
+  ChevronDown,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
@@ -26,14 +34,22 @@ import { SimpleTaskDialog } from "@/components/simple-task-dialog";
 import { WorkflowDialog } from "@/components/workflow-dialog";
 import DraggableChatModal from "@/components/draggable-chat-modal";
 import { useAuth } from "@/contexts/auth-context";
-import type { Person, Category, Allocation, Group, Task } from "@/lib/types";
+import type {
+  Person,
+  Category,
+  Allocation,
+  Group,
+  Task,
+  TaskAllocation,
+} from "@/lib/types";
 import OrgChart from "@/components/org-chart";
 import GroupsTable from "@/components/groups-table";
 import CategoriesTable from "@/components/categories-table";
 import PeopleTable from "@/components/people-table";
 import ResponsibilityChart from "@/components/responsibility-chart";
-import SimpleTasksView from "@/components/simple-tasks-view";
+import TasksView from "@/components/tasks-view";
 import WorkflowsTable from "@/components/workflows-table";
+import CalendarView from "@/components/calendar-view";
 import HowToUseButton from "@/components/how-to-use-button";
 import {
   fetchGroups,
@@ -56,9 +72,10 @@ import {
   updateTask,
   deleteTask,
   createTaskAllocation,
+  fetchTaskAllocations,
   ensureTablesExist,
 } from "@/lib/data-service";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -68,6 +85,7 @@ export default function Dashboard() {
   const [people, setPeople] = useState<Person[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskAllocations, setTaskAllocations] = useState<TaskAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializingDb, setInitializingDb] = useState(false);
@@ -82,11 +100,16 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("orgchart");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedWorkflowForDialog, setSelectedWorkflowForDialog] = useState<{workflow: any, task: Task} | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null
+  );
+  const [selectedWorkflowForDialog, setSelectedWorkflowForDialog] = useState<{
+    workflow: any;
+    task: Task;
+  } | null>(null);
 
   const { toast } = useToast();
-  const { logout, isAdmin, userRole } = useAuth();
+  const { logout, isAdmin, userRole, userId, userEmail } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -99,7 +122,7 @@ export default function Dashboard() {
   // Workflow handlers
   const handleViewWorkflow = (workflow: any) => {
     // Find the task associated with this workflow
-    const task = tasks.find(t => t.id === workflow.taskId);
+    const task = tasks.find((t) => t.id === workflow.taskId);
     if (task) {
       setSelectedWorkflowForDialog({ workflow, task });
       setWorkflowDialogOpen(true);
@@ -114,7 +137,7 @@ export default function Dashboard() {
 
   const handleEditWorkflow = (workflow: any) => {
     // Find the task associated with this workflow
-    const task = tasks.find(t => t.id === workflow.taskId);
+    const task = tasks.find((t) => t.id === workflow.taskId);
     if (task) {
       setSelectedWorkflowForDialog({ workflow, task });
       setWorkflowDialogOpen(true);
@@ -150,12 +173,14 @@ export default function Dashboard() {
             peopleData,
             allocationsData,
             tasksData,
+            taskAllocationsData,
           ] = await Promise.all([
             fetchGroups(),
             fetchCategories(),
             fetchPeople(),
             fetchAllocations(),
             fetchTasks(),
+            fetchTaskAllocations(),
           ]);
 
           setGroups(groupsData);
@@ -163,6 +188,7 @@ export default function Dashboard() {
           setPeople(peopleData);
           setAllocations(allocationsData);
           setTasks(tasksData);
+          setTaskAllocations(taskAllocationsData);
         }
       } catch (error) {
         console.error("Error initializing and loading data:", error);
@@ -178,11 +204,11 @@ export default function Dashboard() {
     }
 
     initializeAndLoadData();
-  }, [dataRefreshTrigger, toast]); // Re-fetch data when dataRefreshTrigger changes
+  }, [dataRefreshTrigger]); // Remove toast dependency to prevent unnecessary re-renders
 
   // Function to refresh data
   const refreshData = () => {
-    setDataRefreshTrigger(prev => prev + 1);
+    setDataRefreshTrigger((prev) => prev + 1);
   };
 
   // Function to manually initialize the database
@@ -447,23 +473,26 @@ export default function Dashboard() {
     }
   };
 
-  const addTaskHandler = async (taskData: Omit<Task, "id" | "createdAt">, allocatedPeople: string[] = []) => {
+  const addTaskHandler = async (
+    taskData: Omit<Task, "id" | "createdAt">,
+    allocatedPeople: string[] = []
+  ) => {
     try {
       const newTask = await createTask(taskData);
       if (newTask) {
         setTasks([...tasks, newTask]);
-        
+
         // Create task allocations for each allocated person
         if (allocatedPeople.length > 0) {
-          const allocationPromises = allocatedPeople.map(personId => 
+          const allocationPromises = allocatedPeople.map((personId) =>
             createTaskAllocation({
               taskId: newTask.id,
               personId: personId,
               isLead: false,
-              estimatedWeeklyHours: 0
+              estimatedWeeklyHours: 0,
             })
           );
-          
+
           try {
             await Promise.all(allocationPromises);
             toast({
@@ -539,7 +568,7 @@ export default function Dashboard() {
     // Switch to tasks tab and select the category
     setActiveTab("tasks");
     setSelectedCategoryId(categoryId);
-    // The SimpleTasksView will handle category selection internally
+    // The TasksView will handle category selection internally
     // We could add state management here if needed for pre-selection
   };
 
@@ -592,7 +621,7 @@ export default function Dashboard() {
       <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between w-full">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold text-gray-900">
-            Land iQ Responsibility Allocation
+            Land iQ - Project Management
           </h1>
           <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
             {userRole?.toUpperCase()}
@@ -601,68 +630,58 @@ export default function Dashboard() {
           <HowToUseButton />
         </div>
         <div className="flex items-center space-x-2">
-          {/* Action Buttons - Only show if admin */}
+          {/* Quick Add Dropdown - Only show if admin */}
           {isAdmin && (
-            <>
-              <Button
-                onClick={() => setGroupDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Group
-              </Button>
-              <Button
-                onClick={() => setCategoryDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
-              <Button
-                onClick={() => setPersonDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add Person
-              </Button>
-              <Button
-                onClick={() => setAllocationDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <ListPlus className="mr-2 h-4 w-4" />
-                Add Allocation
-              </Button>
-              <Button
-                onClick={() => setTaskDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <CheckSquare className="mr-2 h-4 w-4" />
-                Add Task
-              </Button>
-              <Button
-                onClick={() => setWorkflowDialogOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <GitBranch className="mr-2 h-4 w-4" />
-                Add Workflow
-              </Button>
-              <Button
-                onClick={() => setChatModalOpen(true)}
-                className="bg-black text-white hover:bg-gray-800 transition-colors"
-                size="sm"
-              >
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Chat
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  className="bg-black text-white hover:bg-gray-800 transition-colors"
+                  size="sm"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Quick Add
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setAllocationDialogOpen(true)}>
+                  <ListPlus className="mr-2 h-4 w-4" />
+                  Add Allocation
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCategoryDialogOpen(true)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Category
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setGroupDialogOpen(true)}>
+                  <Layers className="mr-2 h-4 w-4" />
+                  Add Group
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPersonDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Person
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTaskDialogOpen(true)}>
+                  <CheckSquare className="mr-2 h-4 w-4" />
+                  Add Task
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setWorkflowDialogOpen(true)}>
+                  <GitBranch className="mr-2 h-4 w-4" />
+                  Add Workflow
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          
+
+          {/* Chat Button - Available to all authenticated users */}
+          <Button
+            onClick={() => setChatModalOpen(true)}
+            className="bg-black text-white hover:bg-gray-800 transition-colors"
+            size="sm"
+          >
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Chat
+          </Button>
+
           <Button
             onClick={handleLogout}
             variant="outline"
@@ -765,6 +784,18 @@ export default function Dashboard() {
             <span className="hidden sm:inline">Analytics</span>
             <span className="sm:hidden">Stats</span>
           </button>
+          <button
+            onClick={() => setActiveTab("calendar")}
+            className={cn(
+              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
+              activeTab === "calendar"
+                ? "border-black text-black"
+                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
+            )}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Calendar
+          </button>
         </div>
       </div>
 
@@ -823,7 +854,7 @@ export default function Dashboard() {
 
         {activeTab === "tasks" && (
           <div className="h-full w-full">
-            <SimpleTasksView
+            <TasksView
               groups={groups}
               categories={categories}
               people={people}
@@ -836,10 +867,10 @@ export default function Dashboard() {
 
         {activeTab === "workflows" && (
           <div className="h-full w-full">
-            <WorkflowsTable 
-              groups={groups} 
-              categories={categories} 
-              tasks={tasks} 
+            <WorkflowsTable
+              groups={groups}
+              categories={categories}
+              tasks={tasks}
               isAdmin={isAdmin}
               onDataChange={refreshData}
               onView={handleViewWorkflow}
@@ -854,9 +885,24 @@ export default function Dashboard() {
             <ResponsibilityChart people={people} allocations={allocations} />
           </div>
         )}
+
+        {activeTab === "calendar" && (
+          <div className="h-full w-full">
+            <CalendarView
+              people={people}
+              groups={groups}
+              tasks={tasks}
+              taskAllocations={taskAllocations}
+              categories={categories}
+              currentUserId={userId || undefined}
+              currentUserEmail={userEmail || undefined}
+              isAdmin={isAdmin}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Dialogs - Only render if admin */}
+      {/* Admin-only Dialogs */}
       {isAdmin && (
         <>
           <GroupDialog
@@ -889,7 +935,9 @@ export default function Dashboard() {
           <SimpleTaskDialog
             open={taskDialogOpen}
             onOpenChange={setTaskDialogOpen}
-            onSave={(taskData, allocatedPeople) => addTaskHandler(taskData, allocatedPeople)}
+            onSave={(taskData, allocatedPeople) =>
+              addTaskHandler(taskData, allocatedPeople)
+            }
             categories={categories}
             availablePeople={people}
             existingAllocations={[]}
@@ -905,13 +953,14 @@ export default function Dashboard() {
               isCreateMode={!selectedWorkflowForDialog}
             />
           )}
-
-          <DraggableChatModal
-            open={chatModalOpen}
-            onOpenChange={setChatModalOpen}
-          />
         </>
       )}
+
+      {/* Chat Modal - Available to all authenticated users */}
+      <DraggableChatModal
+        open={chatModalOpen}
+        onOpenChange={setChatModalOpen}
+      />
     </div>
   );
 }

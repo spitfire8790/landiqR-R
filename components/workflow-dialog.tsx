@@ -27,7 +27,7 @@ import {
   Workflow as WorkflowIcon,
   Eye,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import type { Person, WorkflowTool, Workflow, Task } from "@/lib/types";
 import {
   fetchWorkflows,
@@ -157,7 +157,7 @@ export function WorkflowDialog({
       } else {
         const newWorkflow = await createWorkflow({
           ...workflowData,
-          taskId: task?.id || '',
+          taskId: task?.id || "",
           isActive: true,
         });
         if (newWorkflow) {
@@ -231,9 +231,7 @@ export function WorkflowDialog({
   if (showBuilder) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
-          className="max-w-[95vw] max-h-[95vh] overflow-hidden"
-        >
+        <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <WorkflowIcon className="h-5 w-5" />
@@ -256,7 +254,7 @@ export function WorkflowDialog({
             <WorkflowBuilderProvider
               people={people}
               tools={tools}
-              taskId={task?.id ?? ''}
+              taskId={task?.id ?? ""}
               existingWorkflow={editingWorkflow || viewingWorkflow}
               onSave={handleSaveWorkflow}
             />

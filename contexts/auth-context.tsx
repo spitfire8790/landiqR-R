@@ -10,6 +10,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   userRole: UserRole;
+  userId: string | null;
+  userEmail: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -22,6 +24,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Helper: extract role from the current session (metadata.role)
@@ -36,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentSession = data.session;
       setIsAuthenticated(!!currentSession);
       setUserRole(deriveRoleFromSession(currentSession));
+      setUserId(currentSession?.user?.id || null);
+      setUserEmail(currentSession?.user?.email || null);
       setIsLoading(false);
     };
 
@@ -45,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (_event, session) => {
         setIsAuthenticated(!!session);
         setUserRole(deriveRoleFromSession(session));
+        setUserId(session?.user?.id || null);
+        setUserEmail(session?.user?.email || null);
       }
     );
 
@@ -103,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated,
         isLoading,
         userRole,
+        userId,
+        userEmail,
         login,
         signup,
         logout,

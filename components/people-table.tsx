@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import {
   Table,
   TableBody,
@@ -38,7 +38,7 @@ interface PeopleTableProps {
 type SortField = "name" | "email" | "organisation" | "role";
 type SortDirection = "asc" | "desc";
 
-export default function PeopleTable({
+const PeopleTable = memo(function PeopleTable({
   people,
   onEdit,
   onDelete,
@@ -291,4 +291,6 @@ export default function PeopleTable({
       </AlertDialog>
     </div>
   );
-}
+});
+
+export default PeopleTable;

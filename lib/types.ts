@@ -64,6 +64,15 @@ export interface TaskAllocation {
   createdAt: string
 }
 
+export interface Leave {
+  id: string
+  personId: string
+  startDate: string
+  endDate: string
+  description?: string
+  createdAt: string
+}
+
 // Realtime chat message
 export interface Message {
   id: string

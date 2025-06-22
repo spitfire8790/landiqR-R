@@ -184,12 +184,23 @@ export default function ResponsibilityChart({
   const taskTimeAllocationData = useMemo(() => {
     const timeByPerson: Record<string, number> = {};
 
-    // Sum up hours from task allocations
+    // Group allocations by task to calculate divided hours
+    const taskAllocationGroups: Record<string, string[]> = {};
+    taskAllocations.forEach((allocation) => {
+      if (!taskAllocationGroups[allocation.taskId]) {
+        taskAllocationGroups[allocation.taskId] = [];
+      }
+      taskAllocationGroups[allocation.taskId].push(allocation.personId);
+    });
+
+    // Sum up hours from task allocations, dividing evenly among people
     taskAllocations.forEach((allocation) => {
       const task = tasks.find((t) => t.id === allocation.taskId);
       if (task && task.hoursPerWeek) {
+        const peopleOnTask = taskAllocationGroups[allocation.taskId].length;
+        const hoursPerPerson = task.hoursPerWeek / peopleOnTask;
         timeByPerson[allocation.personId] =
-          (timeByPerson[allocation.personId] || 0) + task.hoursPerWeek;
+          (timeByPerson[allocation.personId] || 0) + hoursPerPerson;
       }
     });
 
@@ -201,7 +212,7 @@ export default function ResponsibilityChart({
       labels: sortedPeople.map((person) => person.name),
       datasets: [
         {
-          label: "Weekly Hours",
+          label: "Allocated Weekly Hours (per person)",
           data: sortedPeople.map((person) => timeByPerson[person.id] || 0),
           backgroundColor: sortedPeople.map((person) =>
             getOrgColor(person.organisation, 0.8)
@@ -250,8 +261,13 @@ export default function ResponsibilityChart({
       const person = people.find((p) => p.id === allocation.personId);
       const task = tasks.find((t) => t.id === allocation.taskId);
       if (person && task && task.hoursPerWeek) {
+        // Count how many people are allocated to this task
+        const peopleOnTask = taskAllocations.filter(
+          (a) => a.taskId === allocation.taskId
+        ).length;
+        const hoursPerPerson = task.hoursPerWeek / peopleOnTask;
         workloadByOrg[person.organisation] =
-          (workloadByOrg[person.organisation] || 0) + task.hoursPerWeek;
+          (workloadByOrg[person.organisation] || 0) + hoursPerPerson;
       }
     });
 
@@ -261,7 +277,7 @@ export default function ResponsibilityChart({
       labels: orgs,
       datasets: [
         {
-          label: "Total Weekly Hours",
+          label: "Total Allocated Weekly Hours",
           data: orgs.map((org) => workloadByOrg[org] || 0),
           borderColor: colors.primary,
           backgroundColor: `${colors.primary}20`,
@@ -503,7 +519,8 @@ export default function ResponsibilityChart({
                   Task Time Allocation by Person
                 </CardTitle>
                 <CardDescription>
-                  Weekly hours allocated to each person across all tasks
+                  Weekly hours per person (task hours divided evenly among
+                  assignees)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -545,7 +562,8 @@ export default function ResponsibilityChart({
                   Workload by Organisation
                 </CardTitle>
                 <CardDescription>
-                  Total weekly hours allocated by organisation
+                  Total allocated hours by organisation (evenly divided among
+                  assignees)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -555,7 +573,7 @@ export default function ResponsibilityChart({
                       labels: workloadTrendData.labels,
                       datasets: [
                         {
-                          label: "Total Weekly Hours",
+                          label: "Total Allocated Weekly Hours",
                           data: workloadTrendData.datasets[0].data,
                           backgroundColor: workloadTrendData.labels.map((org) =>
                             getOrgColor(org, 0.8)

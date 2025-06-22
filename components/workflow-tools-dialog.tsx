@@ -32,7 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Edit, Trash2, Wrench } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import type { WorkflowTool } from "@/lib/types";
 import {
   fetchWorkflowTools,

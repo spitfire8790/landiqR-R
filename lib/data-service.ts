@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow } from "@/lib/types"
+import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow, Leave } from "@/lib/types"
 import { v4 as uuidv4 } from "uuid"
 
 // Check if tables exist and create them if they don't
@@ -1443,6 +1443,141 @@ export async function deleteWorkflow(workflowId: string): Promise<boolean> {
     return true
   } catch (error) {
     console.error("Error deleting workflow:", error)
+    return false
+  }
+}
+
+// Leave CRUD operations
+export async function fetchLeave(): Promise<Leave[]> {
+  try {
+    const { data, error } = await supabase
+      .from("leave")
+      .select("*")
+      .order("start_date", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching leave:", error)
+      return []
+    }
+
+    return data.map((leave) => ({
+      id: leave.id,
+      personId: leave.person_id,
+      startDate: leave.start_date,
+      endDate: leave.end_date,
+      description: leave.description,
+      createdAt: leave.created_at,
+    }))
+  } catch (error) {
+    console.error("Error in fetchLeave:", error)
+    return []
+  }
+}
+
+export async function fetchLeaveByPerson(personId: string): Promise<Leave[]> {
+  try {
+    const { data, error } = await supabase
+      .from("leave")
+      .select("*")
+      .eq("person_id", personId)
+      .order("start_date", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching leave by person:", error)
+      return []
+    }
+
+    return data.map((leave) => ({
+      id: leave.id,
+      personId: leave.person_id,
+      startDate: leave.start_date,
+      endDate: leave.end_date,
+      description: leave.description,
+      createdAt: leave.created_at,
+    }))
+  } catch (error) {
+    console.error("Error in fetchLeaveByPerson:", error)
+    return []
+  }
+}
+
+export async function createLeave(leave: Omit<Leave, "id" | "createdAt">): Promise<Leave | null> {
+  try {
+    const newLeave = {
+      person_id: leave.personId,
+      start_date: leave.startDate,
+      end_date: leave.endDate,
+      description: leave.description,
+    }
+
+    const { data, error } = await supabase.from("leave").insert([newLeave]).select().single()
+
+    if (error) {
+      console.error("Error creating leave:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      personId: data.person_id,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      description: data.description,
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in createLeave:", error)
+    return null
+  }
+}
+
+export async function updateLeave(leave: Leave): Promise<Leave | null> {
+  try {
+    const updatedLeave = {
+      person_id: leave.personId,
+      start_date: leave.startDate,
+      end_date: leave.endDate,
+      description: leave.description,
+    }
+
+    const { data, error } = await supabase
+      .from("leave")
+      .update(updatedLeave)
+      .eq("id", leave.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating leave:", error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      personId: data.person_id,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      description: data.description,
+      createdAt: data.created_at,
+    }
+  } catch (error) {
+    console.error("Error in updateLeave:", error)
+    return null
+  }
+}
+
+export async function deleteLeave(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("leave").delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting leave:", error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in deleteLeave:", error)
     return false
   }
 }
