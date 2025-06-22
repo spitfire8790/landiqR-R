@@ -11,6 +11,7 @@ import {
   Clock,
   Edit,
   Trash2,
+  Download,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import type {
@@ -33,6 +34,10 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { fetchTasksByCategory, fetchTaskAllocations } from "@/lib/data-service";
+import {
+  exportResponsibilityMatrix,
+  exportAllocations,
+} from "@/lib/export-service";
 import {
   DndContext,
   closestCenter,
@@ -613,6 +618,23 @@ export default function OrgChart({
 
           {/* Mobile-friendly controls */}
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() =>
+                exportResponsibilityMatrix(
+                  allocations,
+                  people,
+                  categories,
+                  groups
+                )
+              }
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export Matrix
+            </Button>
+
             <select
               value={selectedPersonId || ""}
               onChange={(e) => setSelectedPersonId(e.target.value || null)}

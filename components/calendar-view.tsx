@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Calendar as CalendarIcon,
   Plus,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { LeaveDialog } from "@/components/leave-dialog";
 import { fetchLeave } from "@/lib/data-service";
+import { exportLeave } from "@/lib/export-service";
 import type {
   Person,
   Group,
@@ -289,14 +291,25 @@ export default function CalendarView({
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
       <div className="flex items-center justify-between p-2 bg-white border-b">
-        <Button
-          onClick={() => setLeaveDialogOpen(true)}
-          className="flex items-center gap-2"
-          size="sm"
-        >
-          <Plus className="h-4 w-4" />
-          Add Leave
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setLeaveDialogOpen(true)}
+            className="flex items-center gap-2"
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Leave
+          </Button>
+          <Button
+            onClick={() => exportLeave(leaveData, people)}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export Leave
+          </Button>
+        </div>
         <div className="flex items-center space-x-4">
           <Button
             variant="outline"

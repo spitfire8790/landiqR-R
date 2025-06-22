@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, Trash2, ChevronUp, ChevronDown, Download } from "lucide-react";
 import { PersonDialog } from "@/components/person-dialog";
 import type { Person } from "@/lib/types";
 import {
@@ -28,6 +28,7 @@ import { motion } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getOrganizationLogo } from "@/lib/utils";
 import Image from "next/image";
+import { exportPeople } from "@/lib/export-service";
 
 interface PeopleTableProps {
   people: Person[];
@@ -111,10 +112,19 @@ const PeopleTable = memo(function PeopleTable({
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex justify-between items-center">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
           People
         </h2>
+        <Button
+          onClick={() => exportPeople(people)}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
       <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900 w-full">
         {sortedPeople.length === 0 ? (

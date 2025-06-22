@@ -21,16 +21,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Eye, Edit, Trash2, Plus, GitBranch } from "lucide-react";
-import { motion } from "framer-motion";
-import type { Workflow, Task, Category, Group } from "@/lib/types";
-import { fetchWorkflows, fetchTasks, deleteWorkflow } from "@/lib/data-service";
+import {
+  Search,
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  GitBranch,
+  Download,
+} from "lucide-react";
+import type { Workflow, Task, Category, Group, Person } from "@/lib/types";
+import {
+  fetchWorkflows,
+  fetchTasks,
+  deleteWorkflow,
+  fetchWorkflowTools,
+} from "@/lib/data-service";
 import { useToast } from "@/components/ui/use-toast";
+import { exportWorkflows } from "@/lib/export-service";
 
 interface WorkflowsTableProps {
   groups: Group[];
   categories: Category[];
   tasks: Task[];
+  people: Person[];
   isAdmin: boolean;
   onEdit: (workflow: Workflow) => void;
   onView: (workflow: Workflow) => void;
@@ -43,6 +57,7 @@ export default function WorkflowsTable({
   groups,
   categories,
   tasks,
+  people,
   isAdmin,
   onEdit,
   onView,
@@ -55,6 +70,7 @@ export default function WorkflowsTable({
   const [searchTerm, setSearchTerm] = useState("");
   const [taskFilter, setTaskFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tools, setTools] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Fetch workflows on component mount
@@ -65,8 +81,12 @@ export default function WorkflowsTable({
   const loadWorkflows = async () => {
     setLoading(true);
     try {
-      const workflowsData = await fetchWorkflows();
+      const [workflowsData, toolsData] = await Promise.all([
+        fetchWorkflows(),
+        fetchWorkflowTools(),
+      ]);
       setWorkflows(workflowsData);
+      setTools(toolsData);
     } catch (error) {
       console.error("Error loading workflows:", error);
       toast({
@@ -159,12 +179,25 @@ export default function WorkflowsTable({
             Manage and view all saved workflows across your tasks
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={onCreateNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Workflow
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() =>
+              exportWorkflows(workflows, tasks, categories, groups)
+            }
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
           </Button>
-        )}
+          {isAdmin && (
+            <Button onClick={onCreateNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Workflow
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -256,13 +289,7 @@ export default function WorkflowsTable({
                   </TableRow>
                 ) : (
                   filteredWorkflows.map((workflow, index) => (
-                    <motion.tr
-                      key={workflow.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="hover:bg-gray-50"
-                    >
+                    <TableRow key={workflow.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
                         {workflow.name}
                       </TableCell>
@@ -307,6 +334,7 @@ export default function WorkflowsTable({
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+
                           {isAdmin && (
                             <>
                               <Button
@@ -328,7 +356,7 @@ export default function WorkflowsTable({
                           )}
                         </div>
                       </TableCell>
-                    </motion.tr>
+                    </TableRow>
                   ))
                 )}
               </TableBody>

@@ -25,6 +25,7 @@ import {
   GitBranch,
   Calendar,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
@@ -33,6 +34,7 @@ import { AllocationDialog } from "@/components/allocation-dialog";
 import { SimpleTaskDialog } from "@/components/simple-task-dialog";
 import { WorkflowDialog } from "@/components/workflow-dialog";
 import DraggableChatModal from "@/components/draggable-chat-modal";
+import HowToUseButton from "@/components/how-to-use-button";
 import { useAuth } from "@/contexts/auth-context";
 import type {
   Person,
@@ -50,7 +52,7 @@ import ResponsibilityChart from "@/components/responsibility-chart";
 import TasksView from "@/components/tasks-view";
 import WorkflowsTable from "@/components/workflows-table";
 import CalendarView from "@/components/calendar-view";
-import HowToUseButton from "@/components/how-to-use-button";
+
 import {
   fetchGroups,
   createGroup,
@@ -77,6 +79,7 @@ import {
 } from "@/lib/data-service";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { exportAllData } from "@/lib/export-service";
 
 export default function Dashboard() {
   // State variables
@@ -90,6 +93,54 @@ export default function Dashboard() {
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializingDb, setInitializingDb] = useState(false);
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0); // Trigger for data refresh
+
+  // Export handler for all data
+  const handleExportAll = async () => {
+    try {
+      // We need to fetch additional data that might not be loaded yet
+      const { fetchResponsibilities, fetchLeave, fetchWorkflows } =
+        await import("@/lib/data-service");
+
+      // Fetch all responsibilities across all tasks
+      const allResponsibilities = [];
+      for (const task of tasks) {
+        const taskResponsibilities = await fetchResponsibilities(task.id);
+        allResponsibilities.push(...taskResponsibilities);
+      }
+
+      // Fetch leave and workflows
+      const [leaveData, workflowsData] = await Promise.all([
+        fetchLeave(),
+        fetchWorkflows(),
+      ]);
+
+      // Export all data
+      exportAllData(
+        groups,
+        categories,
+        people,
+        allocations,
+        tasks,
+        allResponsibilities,
+        taskAllocations,
+        leaveData,
+        workflowsData
+      );
+
+      toast({
+        title: "Export Started",
+        description:
+          "All data is being exported. Multiple CSV files will be downloaded.",
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -626,8 +677,6 @@ export default function Dashboard() {
           <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
             {userRole?.toUpperCase()}
           </div>
-          {/* How to Use Button - Available to all users */}
-          <HowToUseButton />
         </div>
         <div className="flex items-center space-x-2">
           {/* Quick Add Dropdown - Only show if admin */}
@@ -644,29 +693,55 @@ export default function Dashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setAllocationDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setAllocationDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <ListPlus className="mr-2 h-4 w-4" />
                   Add Allocation
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCategoryDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setCategoryDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Add Category
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setGroupDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setGroupDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <Layers className="mr-2 h-4 w-4" />
                   Add Group
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPersonDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setPersonDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add Person
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTaskDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setTaskDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <CheckSquare className="mr-2 h-4 w-4" />
                   Add Task
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setWorkflowDialogOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => setWorkflowDialogOpen(true)}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
                   <GitBranch className="mr-2 h-4 w-4" />
                   Add Workflow
+                </DropdownMenuItem>
+                <div className="border-t my-1"></div>
+                <DropdownMenuItem
+                  onClick={handleExportAll}
+                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export All Data
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -871,6 +946,7 @@ export default function Dashboard() {
               groups={groups}
               categories={categories}
               tasks={tasks}
+              people={people}
               isAdmin={isAdmin}
               onDataChange={refreshData}
               onView={handleViewWorkflow}

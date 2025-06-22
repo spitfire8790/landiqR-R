@@ -9,6 +9,7 @@ import {
   ChevronUp,
   ChevronDown,
   ExternalLinkIcon,
+  Download,
 } from "lucide-react";
 import {
   Table,
@@ -38,6 +39,7 @@ import {
 import { CategoryDialog } from "@/components/category-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
+import { exportCategories } from "@/lib/export-service";
 
 interface CategoriesTableProps {
   categories: Category[];
@@ -137,10 +139,19 @@ const CategoriesTable = memo(function CategoriesTable({
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex justify-between items-center">
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
           Categories
         </h2>
+        <Button
+          onClick={() => exportCategories(categories, groups)}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
       <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900 w-full">
         {/* Filter Controls */}

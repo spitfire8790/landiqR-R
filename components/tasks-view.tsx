@@ -21,6 +21,7 @@ import {
   ExternalLink,
   RefreshCw,
   Layers,
+  Download,
 } from "lucide-react";
 import {
   Select,
@@ -74,6 +75,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { WorkflowDialog } from "@/components/workflow-dialog";
 import { WorkflowToolsDialog } from "@/components/workflow-tools-dialog";
+import { exportTasks } from "@/lib/export-service";
 
 interface TasksViewProps {
   groups: Group[];
@@ -744,14 +746,25 @@ export default function TasksView({
           <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
             Tasks & Responsibilities
           </h2>
-          <Button
-            variant="outline"
-            onClick={() => setWorkflowToolsDialogOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <Wrench className="h-4 w-4" />
-            Workflow Tools
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => exportTasks(tasks, categories, groups)}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setWorkflowToolsDialogOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Wrench className="h-4 w-4" />
+              Workflow Tools
+            </Button>
+          </div>
         </div>
 
         {/* Selection Controls */}
