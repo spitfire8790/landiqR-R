@@ -871,6 +871,8 @@ export function WorkflowBuilder({
         id: edge.id,
         source: edge.source,
         target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
         type: edge.type,
         label: typeof edge.label === "string" ? edge.label : undefined,
         data: edge.data,
@@ -903,7 +905,7 @@ export function WorkflowBuilder({
     }
   };
 
-  // Add animated blue dashed styling to all edges
+  // Add animated blue dashed styling to all edges while preserving handle information
   const animatedEdges = edges.map((edge) => ({
     ...edge,
     animated: true,
@@ -913,6 +915,9 @@ export function WorkflowBuilder({
       strokeWidth: edge.selected ? 3 : 2, // Thicker when selected
     },
     type: "smoothstep",
+    // Preserve handle information for consistent connection points
+    sourceHandle: edge.sourceHandle,
+    targetHandle: edge.targetHandle,
     // Add selection styling
     className: edge.selected ? "selected-edge" : "",
   }));
