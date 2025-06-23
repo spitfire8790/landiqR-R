@@ -51,6 +51,15 @@ import {
   StickyNote,
   ChevronLeft,
   ChevronRight,
+  Undo,
+  Redo,
+  Copy,
+  Clipboard,
+  AlertTriangle,
+  Diamond,
+  Play,
+  Square,
+  GitBranch,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import type { Person, WorkflowTool, Workflow, WorkflowData } from "@/lib/types";
@@ -351,6 +360,293 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
   );
 };
 
+// Decision node component (diamond shape)
+const DecisionNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const colors = getStepNodeColor(data.people, data.peopleData || []);
+
+  // Check if this step should be highlighted based on filters
+  const isHighlighted = shouldHighlightStep(
+    data.people || [],
+    data.peopleData || [],
+    data.filterPerson || "",
+    data.filterOrganisation || ""
+  );
+
+  const hasActiveFilters =
+    (data.filterPerson && data.filterPerson !== "all") ||
+    (data.filterOrganisation && data.filterOrganisation !== "all");
+  const isDulled = hasActiveFilters && !isHighlighted;
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`relative cursor-pointer transition-opacity duration-300 ${
+          isDulled ? "opacity-30" : "opacity-100"
+        }`}
+        style={{ width: "120px", height: "120px" }}
+      >
+        {/* Diamond shape */}
+        <div
+          className={`absolute inset-0 transform rotate-45 ${
+            colors.bg
+          } border-2 ${
+            selected ? colors.selectedBorder : colors.border
+          } shadow-md`}
+          style={{
+            animation: selected
+              ? "glow-selected 2s ease-in-out infinite alternate"
+              : "glow 3s ease-in-out infinite alternate",
+            boxShadow: selected
+              ? `0 0 12px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 30px ${colors.glow}`
+              : `0 0 8px ${colors.glow}, 0 0 15px ${colors.glow}, 0 0 20px ${colors.glow}`,
+          }}
+        />
+
+        {/* Content container */}
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="text-center max-w-full">
+            <div className="font-semibold text-gray-900 text-sm">
+              {data.action || "Decision"}
+            </div>
+            {data.description && (
+              <div className="text-xs text-gray-700 mt-1">
+                {data.description}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Connection handles with labels */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className="w-3 h-3 !bg-blue-500 border-2 border-white"
+          style={{ top: -6 }}
+        />
+
+        {/* Yes (green) - right side */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="yes"
+          className="w-3 h-3 !bg-green-500 border-2 border-white"
+          style={{ right: -6 }}
+        />
+        <span className="absolute right-0 top-1/4 transform translate-x-full -translate-y-1/2 text-xs font-semibold text-green-600 whitespace-nowrap bg-white px-1 rounded shadow-sm border ml-2">
+          Yes
+        </span>
+
+        {/* No (red) - bottom side */}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="no"
+          className="w-3 h-3 !bg-red-500 border-2 border-white"
+          style={{ bottom: -6 }}
+        />
+        <span className="absolute bottom-0 left-3/4 transform translate-y-full -translate-x-1/2 text-xs font-semibold text-red-600 whitespace-nowrap bg-white px-1 rounded shadow-sm border mt-2">
+          No
+        </span>
+
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="w-3 h-3 !bg-blue-500 border-2 border-white"
+          style={{ left: -6 }}
+        />
+      </div>
+    </>
+  );
+};
+
+// Start node component (circle with play icon)
+const StartNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const isDulled = false; // Start nodes are always visible
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`relative cursor-pointer transition-opacity duration-300 ${
+          isDulled ? "opacity-30" : "opacity-100"
+        }`}
+      >
+        {/* Circle shape */}
+        <div
+          className={`w-20 h-20 rounded-full bg-green-100 border-2 ${
+            selected ? "border-green-500" : "border-green-300"
+          } shadow-md flex items-center justify-center`}
+          style={{
+            animation: selected
+              ? "glow-selected 2s ease-in-out infinite alternate"
+              : "glow 3s ease-in-out infinite alternate",
+            boxShadow: selected
+              ? `0 0 12px rgba(34, 197, 94, 0.3), 0 0 20px rgba(34, 197, 94, 0.2), 0 0 30px rgba(34, 197, 94, 0.1)`
+              : `0 0 8px rgba(34, 197, 94, 0.2), 0 0 15px rgba(34, 197, 94, 0.1), 0 0 20px rgba(34, 197, 94, 0.05)`,
+          }}
+        >
+          <Play className="h-8 w-8 text-green-600" fill="currentColor" />
+        </div>
+
+        {/* Label below */}
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 text-center">
+          <div className="font-semibold text-gray-900 text-sm whitespace-nowrap">
+            {data.action || "Start"}
+          </div>
+        </div>
+
+        {/* Connection handles */}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="bottom"
+          className="w-3 h-3 !bg-green-500 border-2 border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className="w-3 h-3 !bg-green-500 border-2 border-white"
+        />
+      </div>
+    </>
+  );
+};
+
+// End node component (circle with square icon)
+const EndNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const isDulled = false; // End nodes are always visible
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`relative cursor-pointer transition-opacity duration-300 ${
+          isDulled ? "opacity-30" : "opacity-100"
+        }`}
+      >
+        {/* Circle shape */}
+        <div
+          className={`w-20 h-20 rounded-full bg-red-100 border-2 ${
+            selected ? "border-red-500" : "border-red-300"
+          } shadow-md flex items-center justify-center`}
+          style={{
+            animation: selected
+              ? "glow-selected 2s ease-in-out infinite alternate"
+              : "glow 3s ease-in-out infinite alternate",
+            boxShadow: selected
+              ? `0 0 12px rgba(239, 68, 68, 0.3), 0 0 20px rgba(239, 68, 68, 0.2), 0 0 30px rgba(239, 68, 68, 0.1)`
+              : `0 0 8px rgba(239, 68, 68, 0.2), 0 0 15px rgba(239, 68, 68, 0.1), 0 0 20px rgba(239, 68, 68, 0.05)`,
+          }}
+        >
+          <Square className="h-6 w-6 text-red-600" fill="currentColor" />
+        </div>
+
+        {/* Label below */}
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 text-center">
+          <div className="font-semibold text-gray-900 text-sm whitespace-nowrap">
+            {data.action || "End"}
+          </div>
+        </div>
+
+        {/* Connection handles */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className="w-3 h-3 !bg-red-500 border-2 border-white"
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="w-3 h-3 !bg-red-500 border-2 border-white"
+        />
+      </div>
+    </>
+  );
+};
+
+// Parallel process node component
+const ParallelNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const colors = getStepNodeColor(data.people, data.peopleData || []);
+
+  const isHighlighted = shouldHighlightStep(
+    data.people || [],
+    data.peopleData || [],
+    data.filterPerson || "",
+    data.filterOrganisation || ""
+  );
+
+  const hasActiveFilters =
+    (data.filterPerson && data.filterPerson !== "all") ||
+    (data.filterOrganisation && data.filterOrganisation !== "all");
+  const isDulled = hasActiveFilters && !isHighlighted;
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`px-4 py-3 shadow-md rounded-md ${colors.bg} border-2 ${
+          selected ? colors.selectedBorder : colors.border
+        } cursor-pointer relative transition-opacity duration-300 ${
+          isDulled ? "opacity-30" : "opacity-100"
+        } min-w-[200px] max-w-[280px] border-l-4 border-l-purple-500`}
+        style={{
+          animation: selected
+            ? "glow-selected 2s ease-in-out infinite alternate"
+            : "glow 3s ease-in-out infinite alternate",
+          boxShadow: selected
+            ? `0 0 12px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 30px ${colors.glow}`
+            : `0 0 8px ${colors.glow}, 0 0 15px ${colors.glow}, 0 0 20px ${colors.glow}`,
+        }}
+      >
+        {/* Connection handles */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className="w-3 h-3 !bg-purple-500 border-2 border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="bottom"
+          className="w-3 h-3 !bg-purple-500 border-2 border-white"
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="w-3 h-3 !bg-purple-500 border-2 border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className="w-3 h-3 !bg-purple-500 border-2 border-white"
+        />
+
+        <div className="flex items-center gap-2 font-semibold text-gray-900 mb-2">
+          <GitBranch className="h-4 w-4 text-purple-600" />
+          <span>{data.action || "Parallel Process"}</span>
+        </div>
+
+        {data.description && (
+          <div className="text-xs text-gray-700 mb-2">{data.description}</div>
+        )}
+
+        <div className="text-xs text-purple-600 italic">
+          Multiple activities run simultaneously
+        </div>
+      </div>
+    </>
+  );
+};
+
 // Helper function to get note color styles
 const getNoteColorStyles = (color: string) => {
   const colorMap: Record<
@@ -577,20 +873,256 @@ export function WorkflowBuilder({
   const [filterPerson, setFilterPerson] = useState<string>("all");
   const [filterOrganisation, setFilterOrganisation] = useState<string>("all");
 
-  // Define nodeTypes inside component
-  const nodeTypes = useMemo(
-    () => ({
-      step: StepNode,
-      notes: NotesNode,
-    }),
+  // Undo/Redo system
+  const [history, setHistory] = useState<{ nodes: Node[]; edges: Edge[] }[]>(
     []
   );
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isUndoRedoAction, setIsUndoRedoAction] = useState(false);
+
+  // Workflow validation
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showValidation, setShowValidation] = useState(false);
+
+  // Copy/Paste functionality
+  const [clipboard, setClipboard] = useState<{
+    nodes: Node[];
+    edges: Edge[];
+  } | null>(null);
+
+  // Edge label functionality
+  const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
+  const [edgeLabelDialogOpen, setEdgeLabelDialogOpen] = useState(false);
+
+  // Save state to history for undo/redo
+  const saveToHistory = useCallback(
+    (newNodes: Node[], newEdges: Edge[]) => {
+      if (isUndoRedoAction) return;
+
+      const newState = { nodes: newNodes, edges: newEdges };
+      setHistory((prev) => {
+        const newHistory = prev.slice(0, historyIndex + 1);
+        newHistory.push(newState);
+        // Limit history to 50 states
+        if (newHistory.length > 50) {
+          newHistory.shift();
+          return newHistory;
+        }
+        return newHistory;
+      });
+      setHistoryIndex((prev) => Math.min(prev + 1, 49));
+    },
+    [historyIndex, isUndoRedoAction]
+  );
+
+  // Undo function
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      setIsUndoRedoAction(true);
+      const prevState = history[historyIndex - 1];
+      setNodes(prevState.nodes);
+      setEdges(prevState.edges);
+      setHistoryIndex((prev) => prev - 1);
+      setTimeout(() => setIsUndoRedoAction(false), 0);
+    }
+  }, [history, historyIndex, setNodes, setEdges]);
+
+  // Redo function
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      setIsUndoRedoAction(true);
+      const nextState = history[historyIndex + 1];
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      setHistoryIndex((prev) => prev + 1);
+      setTimeout(() => setIsUndoRedoAction(false), 0);
+    }
+  }, [history, historyIndex, setNodes, setEdges]);
+
+  // Workflow validation function
+  const validateWorkflow = useCallback(() => {
+    const errors: string[] = [];
+
+    // Check for disconnected nodes
+    const connectedNodeIds = new Set<string>();
+    edges.forEach((edge) => {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    });
+
+    const disconnectedNodes = nodes.filter(
+      (node) => !connectedNodeIds.has(node.id) && nodes.length > 1
+    );
+
+    if (disconnectedNodes.length > 0) {
+      errors.push(`${disconnectedNodes.length} disconnected node(s) found`);
+    }
+
+    // Check for circular dependencies (simple cycle detection)
+    const hasCycle = () => {
+      const visited = new Set<string>();
+      const recursionStack = new Set<string>();
+
+      const dfs = (nodeId: string): boolean => {
+        if (recursionStack.has(nodeId)) return true;
+        if (visited.has(nodeId)) return false;
+
+        visited.add(nodeId);
+        recursionStack.add(nodeId);
+
+        const outgoingEdges = edges.filter((edge) => edge.source === nodeId);
+        for (const edge of outgoingEdges) {
+          if (dfs(edge.target)) return true;
+        }
+
+        recursionStack.delete(nodeId);
+        return false;
+      };
+
+      for (const node of nodes) {
+        if (!visited.has(node.id) && dfs(node.id)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (hasCycle()) {
+      errors.push("Circular dependency detected in workflow");
+    }
+
+    // Check for nodes without people assigned
+    const nodesWithoutPeople = nodes.filter(
+      (node) =>
+        node.type === "step" &&
+        (!node.data?.people ||
+          !Array.isArray(node.data.people) ||
+          node.data.people.length === 0)
+    );
+
+    if (nodesWithoutPeople.length > 0) {
+      errors.push(
+        `${nodesWithoutPeople.length} step(s) without assigned people`
+      );
+    }
+
+    // Check for empty step names
+    const emptySteps = nodes.filter(
+      (node) =>
+        node.type === "step" &&
+        (!node.data?.action ||
+          typeof node.data.action !== "string" ||
+          node.data.action.trim() === "")
+    );
+
+    if (emptySteps.length > 0) {
+      errors.push(`${emptySteps.length} step(s) without names`);
+    }
+
+    setValidationErrors(errors);
+    return errors.length === 0;
+  }, [nodes, edges]);
+
+  // Copy selected nodes and edges
+  const copySelection = useCallback(() => {
+    const selectedNodes = nodes.filter((node) => node.selected);
+    const selectedNodeIds = new Set(selectedNodes.map((node) => node.id));
+    const selectedEdges = edges.filter(
+      (edge) =>
+        selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    );
+
+    if (selectedNodes.length > 0) {
+      setClipboard({ nodes: selectedNodes, edges: selectedEdges });
+      toast({
+        title: "Copied",
+        description: `Copied ${selectedNodes.length} node(s) and ${selectedEdges.length} edge(s)`,
+      });
+    }
+  }, [nodes, edges, toast]);
+
+  // Paste copied nodes and edges
+  const pasteSelection = useCallback(() => {
+    if (!clipboard) return;
+
+    const offset = 50; // Offset for pasted items
+    const nodeIdMap = new Map<string, string>();
+
+    // Create new nodes with new IDs
+    const newNodes = clipboard.nodes.map((node) => {
+      const newId = `${node.type}-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      nodeIdMap.set(node.id, newId);
+
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + offset,
+          y: node.position.y + offset,
+        },
+        selected: true,
+        data: {
+          ...node.data,
+          toolsData: tools,
+          peopleData: people,
+          filterPerson,
+          filterOrganisation,
+        },
+      };
+    });
+
+    // Create new edges with updated node IDs
+    const newEdges = clipboard.edges.map((edge) => ({
+      ...edge,
+      id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      source: nodeIdMap.get(edge.source) || edge.source,
+      target: nodeIdMap.get(edge.target) || edge.target,
+      selected: true,
+    }));
+
+    // Clear existing selection
+    setNodes((nds) => nds.map((node) => ({ ...node, selected: false })));
+    setEdges((eds) => eds.map((edge) => ({ ...edge, selected: false })));
+
+    // Add new nodes and edges
+    setNodes((nds) => nds.concat(newNodes));
+    setEdges((eds) => eds.concat(newEdges));
+
+    toast({
+      title: "Pasted",
+      description: `Pasted ${newNodes.length} node(s) and ${newEdges.length} edge(s)`,
+    });
+  }, [
+    clipboard,
+    tools,
+    people,
+    filterPerson,
+    filterOrganisation,
+    setNodes,
+    setEdges,
+    toast,
+  ]);
 
   // Handle sidebar resizing
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsResizing(true);
     e.preventDefault();
   };
+
+  // Define nodeTypes inside component
+  const nodeTypes = useMemo(
+    () => ({
+      step: StepNode,
+      notes: NotesNode,
+      decision: DecisionNode,
+      start: StartNode,
+      end: EndNode,
+      parallel: ParallelNode,
+    }),
+    []
+  );
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -629,9 +1161,47 @@ export function WorkflowBuilder({
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  // Handle keyboard events for deletion
+  // Track changes for undo/redo
+  useEffect(() => {
+    if (!isUndoRedoAction) {
+      saveToHistory(nodes, edges);
+    }
+  }, [nodes, edges, saveToHistory, isUndoRedoAction]);
+
+  // Handle keyboard events for deletion and undo/redo
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle undo/redo
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key === "z" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        (event.key === "y" || (event.key === "z" && event.shiftKey))
+      ) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+
+      // Handle copy/paste
+      if ((event.ctrlKey || event.metaKey) && event.key === "c") {
+        event.preventDefault();
+        copySelection();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === "v") {
+        event.preventDefault();
+        pasteSelection();
+        return;
+      }
+
       if (event.key === "Delete" || event.key === "Backspace") {
         // Check if focus is on an input field where Backspace should work normally
         const target = event.target as HTMLElement;
@@ -689,6 +1259,23 @@ export function WorkflowBuilder({
       );
     },
     [setNodes, setEdges]
+  );
+
+  // Handle new connections
+  const onConnect = useCallback(
+    (params: Connection) => {
+      // Use the standard addEdge function to create edge with proper typing
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
+            id: `edge-${Date.now()}`,
+          },
+          eds
+        )
+      );
+    },
+    [setEdges]
   );
 
   // Load existing workflow data
@@ -766,6 +1353,30 @@ export function WorkflowBuilder({
     [setEdges, setNodes]
   );
 
+  // Edge double-click handler for editing labels
+  const onEdgeDoubleClick: EdgeMouseHandler = useCallback((event, edge) => {
+    setEditingEdgeId(edge.id);
+    setEdgeLabelDialogOpen(true);
+  }, []);
+
+  // Handle edge label update
+  const handleEdgeLabelUpdate = useCallback(
+    (label: string) => {
+      if (editingEdgeId) {
+        setEdges((eds) =>
+          eds.map((edge) =>
+            edge.id === editingEdgeId
+              ? { ...edge, label: label.trim() || undefined }
+              : edge
+          )
+        );
+        setEditingEdgeId(null);
+        setEdgeLabelDialogOpen(false);
+      }
+    },
+    [editingEdgeId, setEdges]
+  );
+
   // Add new step node
   const addStepNode = () => {
     const newNode: Node = {
@@ -806,6 +1417,72 @@ export function WorkflowBuilder({
     setNewNotesTitle("");
     setNewNotesContent("");
     setNewNotesColor("gray");
+  };
+
+  // Add new decision node
+  const addDecisionNode = () => {
+    const newNode: Node = {
+      id: `decision-${Date.now()}`,
+      type: "decision",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        action: "Decision Point",
+        description: "Choose path based on criteria",
+        people: [],
+        tools: [],
+        toolsData: tools,
+        peopleData: people,
+        filterPerson,
+        filterOrganisation,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  };
+
+  // Add new start node
+  const addStartNode = () => {
+    const newNode: Node = {
+      id: `start-${Date.now()}`,
+      type: "start",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        action: "Start",
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  };
+
+  // Add new end node
+  const addEndNode = () => {
+    const newNode: Node = {
+      id: `end-${Date.now()}`,
+      type: "end",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        action: "End",
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  };
+
+  // Add new parallel node
+  const addParallelNode = () => {
+    const newNode: Node = {
+      id: `parallel-${Date.now()}`,
+      type: "parallel",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        action: "Parallel Process",
+        description: "Multiple tasks running simultaneously",
+        people: [],
+        tools: [],
+        toolsData: tools,
+        peopleData: people,
+        filterPerson,
+        filterOrganisation,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
   };
 
   // Save node edits
@@ -1289,7 +1966,69 @@ export function WorkflowBuilder({
 
           <Separator />
 
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Add Decision Node</h3>
+            <Button
+              onClick={addDecisionNode}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <Diamond className="h-4 w-4 text-blue-600" />
+              <span>Add Decision</span>
+            </Button>
+          </div>
+
+          <Separator />
+
           <div className="space-y-2">
+            <div className="flex gap-2">
+              <Button
+                onClick={undo}
+                disabled={historyIndex <= 0}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo className="h-4 w-4 mr-1" />
+                Undo
+              </Button>
+              <Button
+                onClick={redo}
+                disabled={historyIndex >= history.length - 1}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo className="h-4 w-4 mr-1" />
+                Redo
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={copySelection}
+                disabled={!nodes.some((node) => node.selected)}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                title="Copy (Ctrl+C)"
+              >
+                <Copy className="h-4 w-4 mr-1" />
+                Copy
+              </Button>
+              <Button
+                onClick={pasteSelection}
+                disabled={!clipboard}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                title="Paste (Ctrl+V)"
+              >
+                <Clipboard className="h-4 w-4 mr-1" />
+                Paste
+              </Button>
+            </div>
             <Button
               onClick={saveWorkflow}
               disabled={loading}
@@ -1313,7 +2052,52 @@ export function WorkflowBuilder({
             >
               {showGrid ? "Hide Grid" : "Show Grid"}
             </Button>
+            <Button
+              onClick={() => {
+                validateWorkflow();
+                setShowValidation(true);
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Validate Workflow
+            </Button>
           </div>
+
+          {/* Validation Results */}
+          {showValidation && (
+            <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-sm">Validation Results</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowValidation(false)}
+                  className="p-1 h-6 w-6"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {validationErrors.length === 0 ? (
+                <div className="text-green-600 text-sm">
+                  ✓ Workflow validation passed
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {validationErrors.map((error, index) => (
+                    <div
+                      key={index}
+                      className="text-red-600 text-sm flex items-start gap-1"
+                    >
+                      <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      {error}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Resize handle */}
@@ -1335,10 +2119,11 @@ export function WorkflowBuilder({
           edges={animatedEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
+          onConnect={onConnect}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           onEdgeClick={onEdgeClick}
+          onEdgeDoubleClick={onEdgeDoubleClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
@@ -1366,6 +2151,17 @@ export function WorkflowBuilder({
           tools={tools}
           nodeData={editingNode?.data}
           nodeType={editingNode?.type}
+        />
+        <EdgeLabelDialog
+          open={edgeLabelDialogOpen}
+          onOpenChange={setEdgeLabelDialogOpen}
+          onSave={handleEdgeLabelUpdate}
+          currentLabel={
+            editingEdgeId
+              ? (edges.find((e) => e.id === editingEdgeId)?.label as string) ||
+                ""
+              : ""
+          }
         />
       </div>
     </div>
@@ -1757,6 +2553,71 @@ function NodeEditDialog({
             Save
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// EdgeLabelDialog component for editing edge labels
+function EdgeLabelDialog({
+  open,
+  onOpenChange,
+  onSave,
+  currentLabel,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (label: string) => void;
+  currentLabel: string;
+}) {
+  const [label, setLabel] = useState(currentLabel);
+
+  useEffect(() => {
+    setLabel(currentLabel);
+  }, [currentLabel, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(label);
+  };
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center ${
+        open ? "" : "hidden"
+      }`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edge-label-dialog-title"
+    >
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h3 id="edge-label-dialog-title" className="text-lg font-semibold mb-4">
+          Edit Connection Label
+        </h3>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edge-label">Label</Label>
+              <Input
+                id="edge-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Enter connection label (optional)"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit">Save Label</Button>
+          </div>
+        </form>
       </div>
     </div>
   );
