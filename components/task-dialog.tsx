@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,36 +9,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Plus, Trash2, ExternalLink } from "lucide-react"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
-import type { Task, Category, TaskSourceLink } from "@/lib/types"
-import { 
-  createTaskSourceLink, 
-  updateTaskSourceLink, 
-  deleteTaskSourceLink 
-} from "@/lib/data-service"
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon, Plus, Trash2, ExternalLink } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import type { Task, Category, TaskSourceLink } from "@/lib/types";
+import {
+  createTaskSourceLink,
+  updateTaskSourceLink,
+  deleteTaskSourceLink,
+} from "@/lib/data-service";
 
 interface TaskDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (task: Omit<Task, "id" | "createdAt">, sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]) => void
-  categories: Category[]
-  selectedCategoryId?: string
-  task?: Task
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (
+    task: Omit<Task, "id" | "createdAt">,
+    sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]
+  ) => void;
+  categories: Category[];
+  selectedCategoryId?: string;
+  task?: Task;
 }
 
 export function TaskDialog({
@@ -49,31 +56,31 @@ export function TaskDialog({
   selectedCategoryId,
   task,
 }: TaskDialogProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [categoryId, setCategoryId] = useState("")
-  const [hoursPerWeek, setHoursPerWeek] = useState(0)
-  const [sourceLinks, setSourceLinks] = useState<TaskSourceLink[]>([])
-  const [newLinkUrl, setNewLinkUrl] = useState("")
-  const [newLinkDescription, setNewLinkDescription] = useState("")
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [hoursPerWeek, setHoursPerWeek] = useState(0);
+  const [sourceLinks, setSourceLinks] = useState<TaskSourceLink[]>([]);
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [newLinkDescription, setNewLinkDescription] = useState("");
 
   useEffect(() => {
     if (task) {
-      setName(task.name)
-      setDescription(task.description)
-      setCategoryId(task.categoryId)
-      setHoursPerWeek(task.hoursPerWeek)
-      setSourceLinks(task.sourceLinks || [])
+      setName(task.name);
+      setDescription(task.description);
+      setCategoryId(task.categoryId);
+      setHoursPerWeek(task.hoursPerWeek);
+      setSourceLinks(task.sourceLinks || []);
     } else {
-      setName("")
-      setDescription("")
-      setCategoryId(selectedCategoryId || "")
-      setHoursPerWeek(0)
-      setSourceLinks([])
+      setName("");
+      setDescription("");
+      setCategoryId(selectedCategoryId || "");
+      setHoursPerWeek(0);
+      setSourceLinks([]);
     }
-    setNewLinkUrl("")
-    setNewLinkDescription("")
-  }, [task, selectedCategoryId, open])
+    setNewLinkUrl("");
+    setNewLinkDescription("");
+  }, [task, selectedCategoryId]);
 
   const handleAddSourceLink = () => {
     if (newLinkUrl.trim()) {
@@ -83,26 +90,30 @@ export function TaskDialog({
         url: newLinkUrl.trim(),
         description: newLinkDescription.trim(),
         createdAt: new Date().toISOString(),
-      }
-      setSourceLinks([...sourceLinks, newLink])
-      setNewLinkUrl("")
-      setNewLinkDescription("")
+      };
+      setSourceLinks([...sourceLinks, newLink]);
+      setNewLinkUrl("");
+      setNewLinkDescription("");
     }
-  }
+  };
 
-  const handleUpdateSourceLink = (index: number, field: 'url' | 'description', value: string) => {
-    const updatedLinks = [...sourceLinks]
-    updatedLinks[index] = { ...updatedLinks[index], [field]: value }
-    setSourceLinks(updatedLinks)
-  }
+  const handleUpdateSourceLink = (
+    index: number,
+    field: "url" | "description",
+    value: string
+  ) => {
+    const updatedLinks = [...sourceLinks];
+    updatedLinks[index] = { ...updatedLinks[index], [field]: value };
+    setSourceLinks(updatedLinks);
+  };
 
   const handleDeleteSourceLink = (index: number) => {
-    const updatedLinks = sourceLinks.filter((_, i) => i !== index)
-    setSourceLinks(updatedLinks)
-  }
+    const updatedLinks = sourceLinks.filter((_, i) => i !== index);
+    setSourceLinks(updatedLinks);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (name.trim() && categoryId) {
       // Prepare task data
       const taskData = {
@@ -111,61 +122,67 @@ export function TaskDialog({
         categoryId,
         hoursPerWeek,
         sourceLinks: [], // Will be handled separately
-      }
-      
+      };
+
       if (task?.id) {
         // Editing existing task - handle source links here
         // Handle source links for existing task
-        const existingLinks = task.sourceLinks || []
-        const currentLinks = sourceLinks
+        const existingLinks = task.sourceLinks || [];
+        const currentLinks = sourceLinks;
 
         // Delete removed links
         for (const existingLink of existingLinks) {
-          const stillExists = currentLinks.find(link => link.id === existingLink.id)
+          const stillExists = currentLinks.find(
+            (link) => link.id === existingLink.id
+          );
           if (!stillExists) {
-            await deleteTaskSourceLink(existingLink.id)
+            await deleteTaskSourceLink(existingLink.id);
           }
         }
 
         // Update or create links
         for (const link of currentLinks) {
-          if (link.id.startsWith('temp-')) {
+          if (link.id.startsWith("temp-")) {
             // Create new link
             await createTaskSourceLink({
               taskId: task.id,
               url: link.url,
               description: link.description,
-            })
+            });
           } else {
             // Update existing link
-            const existingLink = existingLinks.find(l => l.id === link.id)
-            if (existingLink && (existingLink.url !== link.url || existingLink.description !== link.description)) {
-              await updateTaskSourceLink(link)
+            const existingLink = existingLinks.find((l) => l.id === link.id);
+            if (
+              existingLink &&
+              (existingLink.url !== link.url ||
+                existingLink.description !== link.description)
+            ) {
+              await updateTaskSourceLink(link);
             }
           }
         }
-        
+
         // Save task without source links data
-        onSave(taskData)
+        onSave(taskData);
       } else {
         // Creating new task - pass source links to parent
         const newSourceLinks = sourceLinks
-          .filter(link => link.id.startsWith('temp-'))
-          .map(link => ({
+          .filter((link) => link.id.startsWith("temp-"))
+          .map((link) => ({
             url: link.url,
             description: link.description,
-          }))
-        
-        onSave(taskData, newSourceLinks)
+          }));
+
+        onSave(taskData, newSourceLinks);
       }
-      
-      onOpenChange(false)
+
+      onOpenChange(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    onOpenChange(false)
-  }
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,7 +190,9 @@ export function TaskDialog({
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Add New Task"}</DialogTitle>
           <DialogDescription>
-            {task ? "Update the task details." : "Create a new task for the selected category."}
+            {task
+              ? "Update the task details."
+              : "Create a new task for the selected category."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -215,11 +234,13 @@ export function TaskDialog({
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {categories
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -234,7 +255,9 @@ export function TaskDialog({
                 min="0"
                 step="0.5"
                 value={hoursPerWeek}
-                onChange={(e) => setHoursPerWeek(parseFloat(e.target.value) || 0)}
+                onChange={(e) =>
+                  setHoursPerWeek(parseFloat(e.target.value) || 0)
+                }
                 className="col-span-3"
                 placeholder="0"
               />
@@ -242,18 +265,21 @@ export function TaskDialog({
 
             {/* Source Links Section */}
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">
-                Source Links
-              </Label>
+              <Label className="text-right pt-2">Source Links</Label>
               <div className="col-span-3 space-y-3">
                 {/* Existing source links */}
                 {sourceLinks.map((link, index) => (
-                  <div key={link.id} className="border rounded-lg p-3 space-y-2">
+                  <div
+                    key={link.id}
+                    className="border rounded-lg p-3 space-y-2"
+                  >
                     <div className="flex items-center gap-2">
                       <Input
                         type="url"
                         value={link.url}
-                        onChange={(e) => handleUpdateSourceLink(index, 'url', e.target.value)}
+                        onChange={(e) =>
+                          handleUpdateSourceLink(index, "url", e.target.value)
+                        }
                         placeholder="https://example.com"
                         className="flex-1"
                       />
@@ -261,7 +287,7 @@ export function TaskDialog({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(link.url, '_blank')}
+                        onClick={() => window.open(link.url, "_blank")}
                         disabled={!link.url}
                       >
                         <ExternalLink className="h-4 w-4" />
@@ -277,7 +303,13 @@ export function TaskDialog({
                     </div>
                     <Input
                       value={link.description || ""}
-                      onChange={(e) => handleUpdateSourceLink(index, 'description', e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateSourceLink(
+                          index,
+                          "description",
+                          e.target.value
+                        )
+                      }
                       placeholder="Optional description"
                     />
                   </div>
@@ -323,5 +355,5 @@ export function TaskDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

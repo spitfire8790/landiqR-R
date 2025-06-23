@@ -79,7 +79,7 @@ export function SimpleTaskDialog({
       setSourceLink("");
       setAllocatedPeople([]);
     }
-  }, [task, selectedCategoryId, open, existingAllocations]);
+  }, [task, selectedCategoryId, existingAllocations]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
