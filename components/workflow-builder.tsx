@@ -49,6 +49,8 @@ import {
   X,
   FileText,
   StickyNote,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import type { Person, WorkflowTool, Workflow, WorkflowData } from "@/lib/types";
@@ -333,22 +335,97 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
   );
 };
 
+// Helper function to get note color styles
+const getNoteColorStyles = (color: string) => {
+  const colorMap: Record<
+    string,
+    {
+      bg: string;
+      border: string;
+      selectedBorder: string;
+      glow: string;
+      handle: string;
+    }
+  > = {
+    gray: {
+      bg: "bg-gray-100",
+      border: "border-gray-300",
+      selectedBorder: "border-blue-500",
+      glow: "rgba(107, 114, 128, 0.2)",
+      handle: "!bg-gray-500",
+    },
+    yellow: {
+      bg: "bg-yellow-100",
+      border: "border-yellow-300",
+      selectedBorder: "border-yellow-500",
+      glow: "rgba(251, 191, 36, 0.2)",
+      handle: "!bg-yellow-500",
+    },
+    blue: {
+      bg: "bg-blue-100",
+      border: "border-blue-300",
+      selectedBorder: "border-blue-500",
+      glow: "rgba(59, 130, 246, 0.2)",
+      handle: "!bg-blue-500",
+    },
+    green: {
+      bg: "bg-green-100",
+      border: "border-green-300",
+      selectedBorder: "border-green-500",
+      glow: "rgba(34, 197, 94, 0.2)",
+      handle: "!bg-green-500",
+    },
+    red: {
+      bg: "bg-red-100",
+      border: "border-red-300",
+      selectedBorder: "border-red-500",
+      glow: "rgba(239, 68, 68, 0.2)",
+      handle: "!bg-red-500",
+    },
+    purple: {
+      bg: "bg-purple-100",
+      border: "border-purple-300",
+      selectedBorder: "border-purple-500",
+      glow: "rgba(168, 85, 247, 0.2)",
+      handle: "!bg-purple-500",
+    },
+    pink: {
+      bg: "bg-pink-100",
+      border: "border-pink-300",
+      selectedBorder: "border-pink-500",
+      glow: "rgba(236, 72, 153, 0.2)",
+      handle: "!bg-pink-500",
+    },
+    orange: {
+      bg: "bg-orange-100",
+      border: "border-orange-300",
+      selectedBorder: "border-orange-500",
+      glow: "rgba(245, 158, 11, 0.2)",
+      handle: "!bg-orange-500",
+    },
+  };
+
+  return colorMap[color] || colorMap.gray;
+};
+
 // Notes node component
 const NotesNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const colors = getNoteColorStyles(data.color || "gray");
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
       <div
-        className={`px-4 py-3 shadow-md rounded-md bg-gray-100 border-2 ${
-          selected ? "border-blue-500" : "border-gray-300"
+        className={`px-4 py-3 shadow-md rounded-md ${colors.bg} border-2 ${
+          selected ? colors.selectedBorder : colors.border
         } min-w-[200px] max-w-[280px] cursor-pointer relative`}
         style={{
           animation: selected
             ? "glow-selected 2s ease-in-out infinite alternate"
             : "glow 3s ease-in-out infinite alternate",
           boxShadow: selected
-            ? `0 0 12px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.1)`
-            : `0 0 8px rgba(107, 114, 128, 0.2), 0 0 15px rgba(107, 114, 128, 0.1), 0 0 20px rgba(107, 114, 128, 0.05)`,
+            ? `0 0 12px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 30px ${colors.glow}`
+            : `0 0 8px ${colors.glow}, 0 0 15px ${colors.glow}, 0 0 20px ${colors.glow}`,
         }}
       >
         {/* Connection handles */}
@@ -356,37 +433,31 @@ const NotesNode = ({ data, selected }: { data: any; selected: boolean }) => {
           type="target"
           position={Position.Top}
           id="top"
-          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
         />
         <Handle
           type="source"
           position={Position.Bottom}
           id="bottom"
-          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
         />
         <Handle
           type="target"
           position={Position.Left}
           id="left"
-          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
         />
         <Handle
           type="source"
           position={Position.Right}
           id="right"
-          className="w-3 h-3 !bg-gray-500 border-2 border-white"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
         />
 
         <div className="flex items-center gap-2 font-semibold text-black mb-2">
           <StickyNote className="h-4 w-4" />
-          <span>Notes</span>
+          <span>{data.title || "Notes"}</span>
         </div>
-
-        {data.title && (
-          <div className="font-medium text-black mb-1 text-sm">
-            {data.title}
-          </div>
-        )}
 
         {data.content && (
           <RichTextDisplay
@@ -440,10 +511,14 @@ export function WorkflowBuilder({
   const [newStepTools, setNewStepTools] = useState<string[]>([]);
   const [newNotesTitle, setNewNotesTitle] = useState("");
   const [newNotesContent, setNewNotesContent] = useState("");
+  const [newNotesColor, setNewNotesColor] = useState("gray");
   const [loading, setLoading] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [showGrid, setShowGrid] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Define nodeTypes inside component
   const nodeTypes = useMemo(
@@ -453,6 +528,49 @@ export function WorkflowBuilder({
     }),
     []
   );
+
+  // Handle sidebar resizing
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const newWidth = e.clientX;
+      if (newWidth >= 250 && newWidth <= 600) {
+        setSidebarWidth(newWidth);
+      }
+    },
+    [isResizing]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    } else {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   // Handle keyboard events for deletion
   useEffect(() => {
@@ -606,11 +724,13 @@ export function WorkflowBuilder({
       data: {
         title: newNotesTitle.trim(),
         content: newNotesContent.trim(),
+        color: newNotesColor,
       },
     };
     setNodes((nds) => nds.concat(newNode));
     setNewNotesTitle("");
     setNewNotesContent("");
+    setNewNotesColor("gray");
   };
 
   // Save node edits
@@ -720,8 +840,35 @@ export function WorkflowBuilder({
   return (
     <div className="flex h-[800px] border rounded-lg overflow-hidden">
       {/* Sidebar */}
-      <div className="w-80 border-r bg-gray-50 flex flex-col">
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+      <div
+        className="border-r bg-gray-50 flex flex-col relative"
+        style={{
+          width: sidebarCollapsed ? "48px" : `${sidebarWidth}px`,
+          minWidth: sidebarCollapsed ? "48px" : "250px",
+          maxWidth: sidebarCollapsed ? "48px" : "600px",
+        }}
+      >
+        {/* Collapse button */}
+        <div className="absolute top-2 right-2 z-10">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1 h-8 w-8"
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+
+        <div
+          className={`p-4 space-y-4 overflow-y-auto flex-1 ${
+            sidebarCollapsed ? "hidden" : ""
+          }`}
+        >
           <div>
             <h3 className="text-lg font-semibold mb-2">Workflow Details</h3>
             <div className="space-y-2">
@@ -922,6 +1069,68 @@ export function WorkflowBuilder({
                   rows={3}
                 />
               </div>
+              <div>
+                <Label>Color</Label>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  {[
+                    {
+                      value: "gray",
+                      bg: "bg-gray-100",
+                      border: "border-gray-300",
+                    },
+                    {
+                      value: "yellow",
+                      bg: "bg-yellow-100",
+                      border: "border-yellow-300",
+                    },
+                    {
+                      value: "blue",
+                      bg: "bg-blue-100",
+                      border: "border-blue-300",
+                    },
+                    {
+                      value: "green",
+                      bg: "bg-green-100",
+                      border: "border-green-300",
+                    },
+                    {
+                      value: "red",
+                      bg: "bg-red-100",
+                      border: "border-red-300",
+                    },
+                    {
+                      value: "purple",
+                      bg: "bg-purple-100",
+                      border: "border-purple-300",
+                    },
+                    {
+                      value: "pink",
+                      bg: "bg-pink-100",
+                      border: "border-pink-300",
+                    },
+                    {
+                      value: "orange",
+                      bg: "bg-orange-100",
+                      border: "border-orange-300",
+                    },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setNewNotesColor(color.value)}
+                      className={`w-8 h-8 rounded-md border-2 ${color.bg} ${
+                        newNotesColor === color.value
+                          ? "border-black"
+                          : color.border
+                      } hover:border-black transition-colors`}
+                      title={
+                        color.value.charAt(0).toUpperCase() +
+                        color.value.slice(1)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
               <Button onClick={addNotesNode} className="w-full">
                 <StickyNote className="h-4 w-4 mr-2" />
                 Add Notes
@@ -957,6 +1166,17 @@ export function WorkflowBuilder({
             </Button>
           </div>
         </div>
+
+        {/* Resize handle */}
+        {!sidebarCollapsed && (
+          <div
+            className="absolute top-0 right-0 w-1 h-full bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors"
+            onMouseDown={handleMouseDown}
+            style={{
+              background: isResizing ? "#9ca3af" : undefined,
+            }}
+          />
+        )}
       </div>
 
       {/* React Flow Canvas */}
@@ -1035,6 +1255,7 @@ function NodeEditDialog({
   // Notes node fields
   const [notesTitle, setNotesTitle] = useState(nodeData?.title || "");
   const [notesContent, setNotesContent] = useState(nodeData?.content || "");
+  const [notesColor, setNotesColor] = useState(nodeData?.color || "gray");
 
   useEffect(() => {
     if (nodeType === "step") {
@@ -1046,6 +1267,7 @@ function NodeEditDialog({
     } else if (nodeType === "notes") {
       setNotesTitle(nodeData?.title || "");
       setNotesContent(nodeData?.content || "");
+      setNotesColor(nodeData?.color || "gray");
     }
   }, [nodeData, nodeType, open]);
 
@@ -1099,6 +1321,68 @@ function NodeEditDialog({
                   placeholder="Enter notes content..."
                   rows={4}
                 />
+              </div>
+              <div>
+                <Label>Color</Label>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  {[
+                    {
+                      value: "gray",
+                      bg: "bg-gray-100",
+                      border: "border-gray-300",
+                    },
+                    {
+                      value: "yellow",
+                      bg: "bg-yellow-100",
+                      border: "border-yellow-300",
+                    },
+                    {
+                      value: "blue",
+                      bg: "bg-blue-100",
+                      border: "border-blue-300",
+                    },
+                    {
+                      value: "green",
+                      bg: "bg-green-100",
+                      border: "border-green-300",
+                    },
+                    {
+                      value: "red",
+                      bg: "bg-red-100",
+                      border: "border-red-300",
+                    },
+                    {
+                      value: "purple",
+                      bg: "bg-purple-100",
+                      border: "border-purple-300",
+                    },
+                    {
+                      value: "pink",
+                      bg: "bg-pink-100",
+                      border: "border-pink-300",
+                    },
+                    {
+                      value: "orange",
+                      bg: "bg-orange-100",
+                      border: "border-orange-300",
+                    },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setNotesColor(color.value)}
+                      className={`w-8 h-8 rounded-md border-2 ${color.bg} ${
+                        notesColor === color.value
+                          ? "border-black"
+                          : color.border
+                      } hover:border-black transition-colors`}
+                      title={
+                        color.value.charAt(0).toUpperCase() +
+                        color.value.slice(1)
+                      }
+                    />
+                  ))}
+                </div>
               </div>
             </>
           ) : (
@@ -1307,6 +1591,7 @@ function NodeEditDialog({
                 onSave({
                   title: notesTitle,
                   content: notesContent,
+                  color: notesColor,
                 });
               } else {
                 onSave({
