@@ -169,13 +169,29 @@ const StepNode = ({ data, selected }: { data: any; selected: boolean }) => {
   const peopleData = data.peopleData || [];
   const colors = getStepNodeColor(data.people, peopleData);
 
+  // Check if this step should be highlighted based on filters
+  const isHighlighted = shouldHighlightStep(
+    data.people || [],
+    peopleData,
+    data.filterPerson || "",
+    data.filterOrganisation || ""
+  );
+
+  // Apply dulling effect if filters are active and this step doesn't match
+  const hasActiveFilters =
+    (data.filterPerson && data.filterPerson !== "all") ||
+    (data.filterOrganisation && data.filterOrganisation !== "all");
+  const isDulled = hasActiveFilters && !isHighlighted;
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
       <div
         className={`px-4 py-3 shadow-md rounded-md ${colors.bg} border-2 ${
           selected ? colors.selectedBorder : colors.border
-        } min-w-[200px] max-w-[280px] cursor-pointer relative`}
+        } min-w-[200px] max-w-[280px] cursor-pointer relative transition-opacity duration-300 ${
+          isDulled ? "opacity-30" : "opacity-100"
+        }`}
         style={{
           animation: selected
             ? "glow-selected 2s ease-in-out infinite alternate"
@@ -408,6 +424,45 @@ const getNoteColorStyles = (color: string) => {
   return colorMap[color] || colorMap.gray;
 };
 
+// Helper function to check if a step should be highlighted based on filters
+const shouldHighlightStep = (
+  stepPeople: string[],
+  peopleData: Person[],
+  filterPerson: string,
+  filterOrganisation: string
+) => {
+  if (
+    (!filterPerson || filterPerson === "all") &&
+    (!filterOrganisation || filterOrganisation === "all")
+  )
+    return true; // No filters active
+
+  // Check if any of the step's people match the filters
+  for (const personId of stepPeople) {
+    // Handle generic users
+    if (personId === "user" || personId === "customer") {
+      if (filterPerson && filterPerson !== "all" && filterPerson === personId)
+        return true;
+      continue;
+    }
+
+    // Handle real people
+    const person = peopleData.find((p) => p.id === personId);
+    if (person) {
+      if (filterPerson && filterPerson !== "all" && filterPerson === personId)
+        return true;
+      if (
+        filterOrganisation &&
+        filterOrganisation !== "all" &&
+        filterOrganisation === person.organisation
+      )
+        return true;
+    }
+  }
+
+  return false;
+};
+
 // Notes node component
 const NotesNode = ({ data, selected }: { data: any; selected: boolean }) => {
   const colors = getNoteColorStyles(data.color || "gray");
@@ -519,6 +574,8 @@ export function WorkflowBuilder({
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [filterPerson, setFilterPerson] = useState<string>("all");
+  const [filterOrganisation, setFilterOrganisation] = useState<string>("all");
 
   // Define nodeTypes inside component
   const nodeTypes = useMemo(
@@ -639,13 +696,15 @@ export function WorkflowBuilder({
     if (existingWorkflow) {
       try {
         const flowData: WorkflowData = JSON.parse(existingWorkflow.flowData);
-        // Add toolsData and peopleData to existing nodes so they can display information
+        // Add toolsData, peopleData, and filter data to existing nodes so they can display information
         const nodesWithData = (flowData.nodes || []).map((node) => ({
           ...node,
           data: {
             ...node.data,
             toolsData: tools,
             peopleData: people,
+            filterPerson,
+            filterOrganisation,
           },
         }));
         setNodes(nodesWithData);
@@ -655,6 +714,20 @@ export function WorkflowBuilder({
       }
     }
   }, [existingWorkflow, tools, people, setNodes, setEdges]);
+
+  // Update nodes with filter data when filters change
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          filterPerson,
+          filterOrganisation,
+        },
+      }))
+    );
+  }, [filterPerson, filterOrganisation, setNodes]);
 
   // Node click handler - single click for selection only
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
@@ -706,6 +779,8 @@ export function WorkflowBuilder({
         tools: newStepTools,
         toolsData: tools,
         peopleData: people,
+        filterPerson,
+        filterOrganisation,
       },
     };
     setNodes((nds) => nds.concat(newNode));
@@ -743,9 +818,14 @@ export function WorkflowBuilder({
               data: {
                 ...n.data,
                 ...data,
-                // Only add toolsData and peopleData for step nodes
+                // Only add toolsData, peopleData, and filter data for step nodes
                 ...(n.type === "step"
-                  ? { toolsData: tools, peopleData: people }
+                  ? {
+                      toolsData: tools,
+                      peopleData: people,
+                      filterPerson,
+                      filterOrganisation,
+                    }
                   : {}),
               },
             }
@@ -891,6 +971,70 @@ export function WorkflowBuilder({
                   rows={2}
                 />
               </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Filters</h3>
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="filter-person">Filter by Person</Label>
+                <Select value={filterPerson} onValueChange={setFilterPerson}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All people" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All people</SelectItem>
+                    <SelectItem value="user">User (Generic)</SelectItem>
+                    <SelectItem value="customer">Customer (Generic)</SelectItem>
+                    {people
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {person.name} ({person.organisation})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="filter-organisation">
+                  Filter by Organisation
+                </Label>
+                <Select
+                  value={filterOrganisation}
+                  onValueChange={setFilterOrganisation}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All organisations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All organisations</SelectItem>
+                    {Array.from(new Set(people.map((p) => p.organisation)))
+                      .sort()
+                      .map((org) => (
+                        <SelectItem key={org} value={org}>
+                          {org}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(filterPerson !== "all" || filterOrganisation !== "all") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFilterPerson("all");
+                    setFilterOrganisation("all");
+                  }}
+                  className="w-full"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </div>
 
