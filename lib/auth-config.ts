@@ -4,6 +4,7 @@ export const ADMIN_EMAILS: string[] = [
   'grace.zhuang@dpie.nsw.gov.au',
   'bernie.no@dpie.nsw.gov.au',
   'sarah.kaehne@wsp.com',
+  'robert.baker-turley@dpie.nsw.gov.au',
   'mark.elakawi@dpie.nsw.gov.au',
   'jacy.macnee@planning.nsw.gov.au',
   'andrew.bobrige@dpie.nsw.gov.au',
@@ -18,6 +19,8 @@ export const ALLOWED_SIGNUP_DOMAINS: string[] = []
 export const READONLY_EMAILS: string[] = [
   // e.g. 'viewer@example.com'
   'jonathan.thorpe@dpie.nsw.gov.au',
+  'justin.mcfeeter@dpie.nsw.gov.au',
+  'naishadh.dave@dpie.nsw.gov.au',
   'lucy@giraffe.build',
   'adam@giraffe.build',
   'loretta.ponting@customerservice.nsw.gov.au', 
