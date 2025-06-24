@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
-import type { Task, Category, Person, TaskAllocation } from "@/lib/types";
+import type { Task, Category, Person, TaskAllocation, TaskSourceLink } from "@/lib/types";
 import { getOrganizationLogo } from "@/lib/utils";
 import Image from "next/image";
 
@@ -56,7 +56,7 @@ export function SimpleTaskDialog({
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [hoursPerWeek, setHoursPerWeek] = useState<number>(0);
-  const [sourceLink, setSourceLink] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [allocatedPeople, setAllocatedPeople] = useState<string[]>([]);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function SimpleTaskDialog({
       setDescription(task.description);
       setCategoryId(task.categoryId);
       setHoursPerWeek(task.hoursPerWeek || 0);
-      setSourceLink(task.sourceLink || "");
+      setSourceUrl(task.sourceLinks && task.sourceLinks.length > 0 ? task.sourceLinks[0].url : "");
       if (existingAllocations) {
         setAllocatedPeople(
           existingAllocations.map((allocation) => allocation.personId)
@@ -76,7 +76,7 @@ export function SimpleTaskDialog({
       setDescription("");
       setCategoryId(selectedCategoryId || "");
       setHoursPerWeek(0);
-      setSourceLink("");
+      setSourceUrl("");
       setAllocatedPeople([]);
     }
   }, [task, selectedCategoryId, existingAllocations]);
@@ -84,13 +84,23 @@ export function SimpleTaskDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && categoryId && hoursPerWeek > 0) {
+      const sourceLinks: TaskSourceLink[] = sourceUrl && sourceUrl.trim() !== ""
+        ? [
+            {
+              id: crypto.randomUUID(),
+              taskId: "", // placeholder, backend should overwrite
+              url: sourceUrl.trim(),
+              createdAt: new Date().toISOString(),
+            } as TaskSourceLink,
+          ]
+        : [];
       onSave(
         {
           name: name.trim(),
           description: description.trim(),
           categoryId,
           hoursPerWeek: Number(hoursPerWeek),
-          sourceLink,
+          sourceLinks,
         },
         allocatedPeople
       );
@@ -187,14 +197,14 @@ export function SimpleTaskDialog({
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sourceLink" className="text-right">
+              <Label htmlFor="sourceUrl" className="text-right">
                 Source Link
               </Label>
               <Input
-                id="sourceLink"
+                id="sourceUrl"
                 type="url"
-                value={sourceLink}
-                onChange={(e) => setSourceLink(e.target.value)}
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
                 className="col-span-3"
                 placeholder="https://example.com/source-material"
               />

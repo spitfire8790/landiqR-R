@@ -10,9 +10,9 @@ export const metadata: Metadata = {
     "Allocate program based responsibilities for Land iQ digital project",
   generator: "v0.dev",
   icons: {
-    icon: "/New_South_Wales_Government_Logo.svg.png",
-    shortcut: "/New_South_Wales_Government_Logo.svg.png",
-    apple: "/New_South_Wales_Government_Logo.svg.png",
+    icon: "/New_South_Wales_Government_logo.svg.png",
+    shortcut: "/New_South_Wales_Government_logo.svg.png",
+    apple: "/New_South_Wales_Government_logo.svg.png",
   },
 };
 
