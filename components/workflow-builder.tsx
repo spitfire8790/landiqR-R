@@ -1263,20 +1263,42 @@ export function WorkflowBuilder({
 
   // Handle new connections
   const onConnect = useCallback(
-    (params: Connection) => {
-      // Use the standard addEdge function to create edge with proper typing
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            id: `edge-${Date.now()}`,
-          },
-          eds
-        )
-      );
-    },
-    [setEdges]
-  );
+  (params: Connection) => {
+    // Defensive: Ensure sourceHandle and targetHandle are always set
+    let { sourceHandle, targetHandle, source, target } = params;
+    if (!sourceHandle) {
+      // Try to guess the most likely handle id based on node type
+      // (You may want to improve this logic if you add more node types)
+      if (source && source.startsWith('start')) sourceHandle = 'bottom';
+      else if (source && source.startsWith('step')) sourceHandle = 'bottom';
+      else if (source && source.startsWith('parallel')) sourceHandle = 'bottom';
+      else if (source && source.startsWith('decision')) sourceHandle = 'yes'; // default to 'yes' for decision
+      else sourceHandle = 'bottom';
+      console.warn('Missing sourceHandle on connect, defaulting to', sourceHandle, params);
+    }
+    if (!targetHandle) {
+      if (target && target.startsWith('end')) targetHandle = 'top';
+      else if (target && target.startsWith('step')) targetHandle = 'top';
+      else if (target && target.startsWith('parallel')) targetHandle = 'top';
+      else if (target && target.startsWith('decision')) targetHandle = 'top';
+      else targetHandle = 'top';
+      console.warn('Missing targetHandle on connect, defaulting to', targetHandle, params);
+    }
+    setEdges((eds) =>
+      addEdge(
+        {
+          ...params,
+          id: `edge-${Date.now()}`,
+          sourceHandle,
+          targetHandle,
+        },
+        eds
+      )
+    );
+  },
+  [setEdges]
+);
+
 
   // Load existing workflow data
   useEffect(() => {
