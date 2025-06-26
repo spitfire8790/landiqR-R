@@ -872,6 +872,7 @@ export function WorkflowBuilder({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [filterPerson, setFilterPerson] = useState<string>("all");
   const [filterOrganisation, setFilterOrganisation] = useState<string>("all");
+  const [showNotes, setShowNotes] = useState(true);
 
   // Undo/Redo system
   const [history, setHistory] = useState<{ nodes: Node[]; edges: Edge[] }[]>(
@@ -1621,6 +1622,17 @@ export function WorkflowBuilder({
     className: edge.selected ? "selected-edge" : "",
   }));
 
+  // Filter edges connected to notes nodes when showNotes is false
+  const filteredEdges = animatedEdges.filter((edge) => {
+    if (showNotes) return true;
+    
+    // Check if either source or target node is a notes node
+    const sourceNode = nodes.find(node => node.id === edge.source);
+    const targetNode = nodes.find(node => node.id === edge.target);
+    
+    return sourceNode?.type !== "notes" && targetNode?.type !== "notes";
+  });
+
   return (
     <div className="flex h-[800px] border rounded-lg overflow-hidden">
       {/* Sidebar */}
@@ -1802,6 +1814,7 @@ export function WorkflowBuilder({
                                 newStepPeople.filter((id) => id !== pid)
                               )
                             }
+                            title="Remove person"
                           >
                             ×
                           </button>
@@ -1820,6 +1833,7 @@ export function WorkflowBuilder({
                                 newStepPeople.filter((id) => id !== pid)
                               )
                             }
+                            title="Remove person"
                           >
                             ×
                           </button>
@@ -1831,13 +1845,25 @@ export function WorkflowBuilder({
                     const person = people.find((p: Person) => p.id === pid);
                     return person ? (
                       <Badge key={pid} className="bg-blue-100 text-blue-800">
-                        {person.name}{" "}
+                        <div className="flex items-center gap-1">
+                          <span>{person.name}</span>
+                          {getOrganizationLogo(person.organisation) && (
+                            <Image
+                              src={getOrganizationLogo(person.organisation)}
+                              alt={`${person.organisation} logo`}
+                              width={12}
+                              height={12}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                        </div>{" "}
                         <button
                           onClick={() =>
                             setNewStepPeople(
                               newStepPeople.filter((id) => id !== pid)
                             )
                           }
+                          title="Remove person"
                         >
                           ×
                         </button>
@@ -1879,6 +1905,7 @@ export function WorkflowBuilder({
                               newStepTools.filter((id) => id !== tid)
                             )
                           }
+                          aria-label="Remove tool"
                         >
                           ×
                         </button>
@@ -2135,10 +2162,22 @@ export function WorkflowBuilder({
       </div>
 
       {/* React Flow Canvas */}
-      <div className="flex-1" ref={reactFlowWrapper}>
+      <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <Button
+          onClick={() => setShowNotes(!showNotes)}
+          variant="outline"
+          className="absolute top-2 right-2 z-10"
+        >
+          {showNotes ? (
+            <StickyNote className="h-4 w-4 mr-2" />
+          ) : (
+            <StickyNote className="h-4 w-4 mr-2 text-gray-400" />
+          )}
+          {showNotes ? "Hide Notes" : "Show Notes"}
+        </Button>
         <ReactFlow
-          nodes={nodes}
-          edges={animatedEdges}
+          nodes={nodes.filter((node) => showNotes || node.type !== "notes")}
+          edges={filteredEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
