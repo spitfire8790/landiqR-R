@@ -140,3 +140,24 @@ export interface WorkflowData {
   edges: WorkflowEdge[]
   viewport: { x: number; y: number; zoom: number }
 }
+
+// Collaboration & Notification system types
+export interface Comment {
+  id: string
+  parentType: 'task' | 'responsibility'
+  parentId: string
+  authorId: string
+  body: string
+  createdAt: string
+}
+
+export type NotificationType = 'mention' | 'assignment'
+
+export interface Notification {
+  id: string
+  recipientId: string
+  type: NotificationType
+  payload: any // e.g. { commentId, taskId }
+  read: boolean
+  createdAt: string
+}

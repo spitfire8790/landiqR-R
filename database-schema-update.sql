@@ -46,41 +46,53 @@ ALTER TABLE public.task_allocations ENABLE ROW LEVEL SECURITY;
 -- These are basic policies - you may want to customize based on your auth requirements
 
 -- Tasks policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.tasks;
 CREATE POLICY "Enable read access for all users" ON public.tasks
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.tasks;
 CREATE POLICY "Enable insert for authenticated users" ON public.tasks
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.tasks;
 CREATE POLICY "Enable update for authenticated users" ON public.tasks
     FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.tasks;
 CREATE POLICY "Enable delete for authenticated users" ON public.tasks
     FOR DELETE USING (true);
 
 -- Responsibilities policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.responsibilities;
 CREATE POLICY "Enable read access for all users" ON public.responsibilities
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.responsibilities;
 CREATE POLICY "Enable insert for authenticated users" ON public.responsibilities
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.responsibilities;
 CREATE POLICY "Enable update for authenticated users" ON public.responsibilities
     FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.responsibilities;
 CREATE POLICY "Enable delete for authenticated users" ON public.responsibilities
     FOR DELETE USING (true);
 
 -- Task allocations policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.task_allocations;
 CREATE POLICY "Enable read access for all users" ON public.task_allocations
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.task_allocations;
 CREATE POLICY "Enable insert for authenticated users" ON public.task_allocations
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.task_allocations;
 CREATE POLICY "Enable update for authenticated users" ON public.task_allocations
     FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.task_allocations;
 CREATE POLICY "Enable delete for authenticated users" ON public.task_allocations
     FOR DELETE USING (true);
 
@@ -118,28 +130,36 @@ ALTER TABLE public.workflow_tools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workflows ENABLE ROW LEVEL SECURITY;
 
 -- Workflow tools policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.workflow_tools;
 CREATE POLICY "Enable read access for all users" ON public.workflow_tools
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.workflow_tools;
 CREATE POLICY "Enable insert for authenticated users" ON public.workflow_tools
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.workflow_tools;
 CREATE POLICY "Enable update for authenticated users" ON public.workflow_tools
     FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.workflow_tools;
 CREATE POLICY "Enable delete for authenticated users" ON public.workflow_tools
     FOR DELETE USING (true);
 
 -- Workflows policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.workflows;
 CREATE POLICY "Enable read access for all users" ON public.workflows
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.workflows;
 CREATE POLICY "Enable insert for authenticated users" ON public.workflows
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.workflows;
 CREATE POLICY "Enable update for authenticated users" ON public.workflows
     FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.workflows;
 CREATE POLICY "Enable delete for authenticated users" ON public.workflows
     FOR DELETE USING (true);
 
@@ -173,3 +193,60 @@ INSERT INTO public.responsibilities (description, assigned_person_id, estimated_
 INSERT INTO public.task_allocations (task_id, person_id, is_lead) VALUES 
 ('your-task-id', 'your-person-id', true);
 */
+
+-- COMMENT & NOTIFICATION SYSTEM TABLES --
+
+-- Create comments table for discussion threads on tasks and responsibilities
+CREATE TABLE IF NOT EXISTS public.comments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    parent_type TEXT CHECK (parent_type IN ('task','responsibility')) NOT NULL,
+    parent_id UUID NOT NULL,
+    author_id UUID NOT NULL REFERENCES public.people(id) ON DELETE SET NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Indexes for faster look-ups
+CREATE INDEX IF NOT EXISTS idx_comments_parent ON public.comments(parent_type, parent_id);
+CREATE INDEX IF NOT EXISTS idx_comments_author ON public.comments(author_id);
+
+-- Enable Row Level Security and basic policies (adjust to taste)
+ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Comments read" ON public.comments;
+CREATE POLICY "Comments read"   ON public.comments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Comments insert" ON public.comments;
+CREATE POLICY "Comments insert" ON public.comments FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Comments update" ON public.comments;
+CREATE POLICY "Comments update" ON public.comments FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Comments delete" ON public.comments;
+CREATE POLICY "Comments delete" ON public.comments FOR DELETE USING (true);
+
+-- Create enum for notification types
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_type') THEN
+        CREATE TYPE public.notification_type AS ENUM ('mention','assignment');
+    END IF;
+END $$;
+
+-- Create notifications table for @mentions and allocation changes
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    recipient_id UUID NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    type public.notification_type NOT NULL,
+    payload JSONB NOT NULL, -- stores comment ID, task ID, etc.
+    read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON public.notifications(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(read);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Notifications read" ON public.notifications;
+CREATE POLICY "Notifications read"   ON public.notifications FOR SELECT USING (recipient_id = auth.uid()::uuid OR true);
+DROP POLICY IF EXISTS "Notifications insert" ON public.notifications;
+CREATE POLICY "Notifications insert" ON public.notifications FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Notifications update" ON public.notifications;
+CREATE POLICY "Notifications update" ON public.notifications FOR UPDATE USING (recipient_id = auth.uid()::uuid OR true);
+-- No delete policy yet; admins can manage via Supabase UI
+

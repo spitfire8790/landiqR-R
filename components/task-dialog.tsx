@@ -35,6 +35,8 @@ import {
   updateTaskSourceLink,
   deleteTaskSourceLink,
 } from "@/lib/data-service";
+import CommentThread from "@/components/comment-thread";
+import { useAuth } from "@/contexts/auth-context";
 
 interface TaskDialogProps {
   open: boolean;
@@ -344,6 +346,18 @@ export function TaskDialog({
               </div>
             </div>
           </div>
+
+          {/* Comment Thread for existing tasks */}
+          {task?.id && (
+            <div className="mt-6 pt-6 border-t">
+              <CommentThread
+                parentType="task"
+                parentId={task.id}
+                readOnly={false}
+              />
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel

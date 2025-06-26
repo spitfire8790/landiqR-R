@@ -35,6 +35,7 @@ import { SimpleTaskDialog } from "@/components/simple-task-dialog";
 import { WorkflowDialog } from "@/components/workflow-dialog";
 import DraggableChatModal from "@/components/draggable-chat-modal";
 import HowToUseButton from "@/components/how-to-use-button";
+import NotificationBell from "@/components/notification-bell";
 import { useAuth } from "@/contexts/auth-context";
 import type {
   Person,
@@ -756,6 +757,9 @@ export default function Dashboard() {
             <MessageCircle className="mr-2 h-4 w-4" />
             Chat
           </Button>
+
+          {/* Notification Bell - Available to all authenticated users */}
+          <NotificationBell />
 
           <Button
             onClick={handleLogout}

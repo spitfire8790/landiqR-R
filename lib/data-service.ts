@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase"
-import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow, Leave } from "@/lib/types"
+import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow, Leave, Comment, Notification } from "@/lib/types"
 import { v4 as uuidv4 } from "uuid"
 
 // Check if tables exist and create them if they don't
@@ -97,8 +97,28 @@ export async function ensureTablesExist() {
         CREATE TABLE IF NOT EXISTS public.messages (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
           user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-          content TEXT NOT NULL,
+          body TEXT NOT NULL,
           author_email TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Comments table for task and responsibility discussions
+        CREATE TABLE IF NOT EXISTS public.comments (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          parent_type TEXT NOT NULL CHECK (parent_type IN ('task', 'responsibility')),
+          parent_id UUID NOT NULL,
+          author_id TEXT NOT NULL,
+          body TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Notifications table for mentions and assignments
+        CREATE TABLE IF NOT EXISTS public.notifications (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          recipient_id TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('mention', 'assignment')),
+          payload JSONB NOT NULL DEFAULT '{}',
+          read BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
         
@@ -125,6 +145,37 @@ export async function ensureTablesExist() {
         CREATE INDEX IF NOT EXISTS idx_responsibilities_assigned_person_id ON public.responsibilities(assigned_person_id);
         CREATE INDEX IF NOT EXISTS idx_task_allocations_task_id ON public.task_allocations(task_id);
         CREATE INDEX IF NOT EXISTS idx_task_allocations_person_id ON public.task_allocations(person_id);
+        CREATE INDEX IF NOT EXISTS idx_comments_parent ON public.comments(parent_type, parent_id);
+        CREATE INDEX IF NOT EXISTS idx_comments_created_at ON public.comments(created_at);
+        CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON public.notifications(recipient_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(recipient_id, read);
+        
+        -- Enable Row Level Security
+        ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+        
+        -- Create RLS policies for comments
+        CREATE POLICY IF NOT EXISTS "Users can view all comments" ON public.comments
+          FOR SELECT USING (true);
+        
+        CREATE POLICY IF NOT EXISTS "Users can insert their own comments" ON public.comments
+          FOR INSERT WITH CHECK (auth.uid()::text = author_id);
+        
+        CREATE POLICY IF NOT EXISTS "Users can update their own comments" ON public.comments
+          FOR UPDATE USING (auth.uid()::text = author_id);
+        
+        CREATE POLICY IF NOT EXISTS "Users can delete their own comments" ON public.comments
+          FOR DELETE USING (auth.uid()::text = author_id);
+        
+        -- Create RLS policies for notifications
+        CREATE POLICY IF NOT EXISTS "Users can view their own notifications" ON public.notifications
+          FOR SELECT USING (auth.uid()::text = recipient_id);
+        
+        CREATE POLICY IF NOT EXISTS "Users can insert notifications" ON public.notifications
+          FOR INSERT WITH CHECK (true);
+        
+        CREATE POLICY IF NOT EXISTS "Users can update their own notifications" ON public.notifications
+          FOR UPDATE USING (auth.uid()::text = recipient_id);
       `
 
       // Execute the SQL script using Supabase's rpc function
@@ -1579,5 +1630,144 @@ export async function deleteLeave(id: string): Promise<boolean> {
   } catch (error) {
     console.error("Error in deleteLeave:", error)
     return false
+  }
+}
+
+// Fetch notifications for a user
+export async function fetchNotifications(recipientId: string): Promise<Notification[]> {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_id', recipientId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching notifications:', error)
+      return []
+    }
+
+    return data.map((notification) => ({
+      id: notification.id,
+      recipientId: notification.recipient_id,
+      type: notification.type,
+      payload: notification.payload,
+      read: notification.read,
+      createdAt: notification.created_at,
+    }))
+  } catch (e) {
+    console.error('Error in fetchNotifications:', e)
+    return []
+  }
+}
+
+// Mark notification as read
+export async function markNotificationAsRead(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error marking notification as read:', error)
+      return false
+    }
+
+    return true
+  } catch (e) {
+    console.error('Error in markNotificationAsRead:', e)
+    return false
+  }
+}
+
+// Create a notification
+export async function createNotification(notification: Omit<Notification, 'id' | 'read' | 'createdAt'> & { read?: boolean }): Promise<Notification | null> {
+  try {
+    const insert = {
+      recipient_id: notification.recipientId,
+      type: notification.type,
+      payload: notification.payload,
+      read: notification.read ?? false,
+    }
+
+    const { data, error } = await supabase.from('notifications').insert([insert]).select().single()
+
+    if (error) {
+      console.error('Error creating notification:', error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      recipientId: data.recipient_id,
+      type: data.type,
+      payload: data.payload,
+      read: data.read,
+      createdAt: data.created_at,
+    }
+  } catch (e) {
+    console.error('Error in createNotification:', e)
+    return null
+  }
+}
+
+// Fetch comments for a task or responsibility
+export async function fetchComments(parentType: 'task' | 'responsibility', parentId: string): Promise<Comment[]> {
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('parent_type', parentType)
+      .eq('parent_id', parentId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching comments:', error)
+      return []
+    }
+
+    return data.map((comment) => ({
+      id: comment.id,
+      parentType: comment.parent_type,
+      parentId: comment.parent_id,
+      authorId: comment.author_id,
+      body: comment.body,
+      createdAt: comment.created_at,
+    }))
+  } catch (e) {
+    console.error('Error in fetchComments:', e)
+    return []
+  }
+}
+
+// Create a comment
+export async function createComment(comment: Omit<Comment, 'id' | 'createdAt'>): Promise<Comment | null> {
+  try {
+    const insert = {
+      parent_type: comment.parentType,
+      parent_id: comment.parentId,
+      author_id: comment.authorId,
+      body: comment.body,
+    }
+
+    const { data, error } = await supabase.from('comments').insert([insert]).select().single()
+
+    if (error) {
+      console.error('Error creating comment:', error)
+      return null
+    }
+
+    return {
+      id: data.id,
+      parentType: data.parent_type,
+      parentId: data.parent_id,
+      authorId: data.author_id,
+      body: data.body,
+      createdAt: data.created_at,
+    }
+  } catch (e) {
+    console.error('Error in createComment:', e)
+    return null
   }
 }

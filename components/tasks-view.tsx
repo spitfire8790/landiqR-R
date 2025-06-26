@@ -51,11 +51,12 @@ import type {
   Task,
   Responsibility,
   TaskAllocation,
+  TaskSourceLink,
   Group,
   Category,
   Person,
 } from "@/lib/types";
-import { SimpleTaskDialog } from "@/components/simple-task-dialog";
+import { TaskDialog } from "@/components/task-dialog";
 import { ResponsibilityDialog } from "@/components/responsibility-dialog";
 import TaskAllocationDialog from "@/components/task-allocation-dialog";
 import {
@@ -732,10 +733,20 @@ export default function TasksView({
   };
 
   const clearAllFilters = () => {
-    setSelectedGroupId("all");
+    setSelectedGroupId("");
     setSelectedCategoryId("all");
     setCategoryFilter("all");
     setPersonFilter("all");
+  };
+
+  // Wrapper function to handle TaskDialog's onSave signature
+  const handleTaskDialogSave = (
+    taskData: Omit<Task, "id" | "createdAt">,
+    sourceLinks?: Omit<TaskSourceLink, "id" | "taskId" | "createdAt">[]
+  ) => {
+    // For now, we'll handle the task save without source links integration
+    // The TaskDialog will handle source links internally
+    handleTaskSave(taskData, []);
   };
 
   return (
@@ -1112,17 +1123,13 @@ export default function TasksView({
       </div>
 
       {/* Dialogs */}
-      <SimpleTaskDialog
+      <TaskDialog
         open={taskDialogOpen}
         onOpenChange={setTaskDialogOpen}
-        onSave={handleTaskSave}
+        onSave={handleTaskDialogSave}
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         task={editingTask}
-        availablePeople={people}
-        existingAllocations={
-          editingTask ? taskAllocations[editingTask.id] || [] : []
-        }
       />
 
       {selectedTask && (

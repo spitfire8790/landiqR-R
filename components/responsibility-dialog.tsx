@@ -23,6 +23,7 @@ import {
 import type { Responsibility, Person } from "@/lib/types";
 import { getOrganizationLogo } from "@/lib/utils";
 import Image from "next/image";
+import CommentThread from "@/components/comment-thread";
 
 interface ResponsibilityDialogProps {
   open: boolean;
@@ -158,6 +159,18 @@ export function ResponsibilityDialog({
               />
             </div>
           </div>
+
+          {/* Comment Thread for existing responsibilities */}
+          {responsibility?.id && (
+            <div className="mt-6 pt-6 border-t">
+              <CommentThread
+                parentType="responsibility"
+                parentId={responsibility.id}
+                readOnly={false}
+              />
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel
