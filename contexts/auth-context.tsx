@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { ADMIN_EMAILS, READONLY_EMAILS } from "@/lib/auth-config";
+import { getUserRole, ensureUserRolesTable } from "@/lib/user-management";
 
 export type UserRole = "admin" | "readonly" | null;
 
@@ -28,9 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Helper: extract role from the current session (metadata.role)
-  const deriveRoleFromSession = (session: any): UserRole => {
-    return (session?.user?.user_metadata?.role as UserRole) || null;
+  // Helper: extract role from the database based on email
+  const deriveRoleFromSession = async (session: any): Promise<UserRole> => {
+    if (!session?.user?.email) return null;
+
+    try {
+      const role = await getUserRole(session.user.email);
+      return role;
+    } catch (error) {
+      console.error("Error getting user role:", error);
+      return null;
+    }
   };
 
   // Initialise auth state once on mount and subscribe to further changes
@@ -39,7 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase.auth.getSession();
       const currentSession = data.session;
       setIsAuthenticated(!!currentSession);
-      setUserRole(deriveRoleFromSession(currentSession));
+
+      const role = await deriveRoleFromSession(currentSession);
+      setUserRole(role);
+
       setUserId(currentSession?.user?.id || null);
       setUserEmail(currentSession?.user?.email || null);
       setIsLoading(false);
@@ -48,9 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setIsAuthenticated(!!session);
-        setUserRole(deriveRoleFromSession(session));
+
+        const role = await deriveRoleFromSession(session);
+        setUserRole(role);
+
         setUserId(session?.user?.id || null);
         setUserEmail(session?.user?.email || null);
       }
@@ -76,13 +90,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sign-up helper (stores selected role in user_metadata)
   const signup = async (email: string, password: string): Promise<boolean> => {
-    // Only allow exact whitelisted emails
-    if (!ADMIN_EMAILS.includes(email) && !READONLY_EMAILS.includes(email)) {
-      console.warn("Signup attempt blocked: unauthorised email");
+    // Ensure user roles table exists
+    await ensureUserRolesTable();
+
+    // Check if user has a role in the database
+    const userRole = await getUserRole(email);
+    if (!userRole) {
+      console.warn("Signup attempt blocked: user not authorized");
       return false;
     }
 
-    const role: UserRole = ADMIN_EMAILS.includes(email) ? "admin" : "readonly";
+    const role: UserRole = userRole;
 
     const { error } = await supabase.auth.signUp({
       email,

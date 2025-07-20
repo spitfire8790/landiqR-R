@@ -1,14 +1,16 @@
-import type { Metadata } from "next"
-import Dashboard from "@/components/dashboard"
-import ProtectedRoute from "@/components/protected-route"
+import type { Metadata } from "next";
+import Dashboard from "@/components/dashboard";
+import ProtectedRoute from "@/components/protected-route";
+
+import { BRAND_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: "Land iQ - Roles and Responsibilities",
-  description: "Allocate program based responsibilities for Land iQ digital project",
-}
+  title: `${BRAND_NAME} - Roles and Responsibilities`,
+  description: `Allocate program based responsibilities for ${BRAND_NAME} digital project`,
+};
 
 // This disables static generation for this page
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
@@ -17,5 +19,5 @@ export default function Home() {
         <Dashboard />
       </div>
     </ProtectedRoute>
-  )
+  );
 }

@@ -3,11 +3,13 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth-context";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
+import { BRAND_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: "Land iQ - Roles and Responsibilities",
-  description:
-    "Allocate program based responsibilities for Land iQ digital project",
+  title: `${BRAND_NAME} - Roles and Responsibilities`,
+  description: `Allocate program based responsibilities for ${BRAND_NAME} digital project`,
   generator: "v0.dev",
   icons: {
     icon: "/New_South_Wales_Government_logo.svg.png",
@@ -30,10 +32,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              {children}
+              <Toaster />
+            </AuthProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

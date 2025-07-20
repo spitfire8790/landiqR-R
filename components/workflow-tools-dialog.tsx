@@ -171,10 +171,10 @@ export function WorkflowToolsDialog({
 
     setLoading(true);
     try {
-      let iconUrl = icon;
+      let iconUrl: string = icon;
       if (iconFile) {
-        iconUrl = await uploadToolIcon(iconFile);
-        if (!iconUrl) {
+        const uploadResult = await uploadToolIcon(iconFile);
+        if (!uploadResult) {
           toast({
             title: "Error",
             description: "Failed to upload icon image.",
@@ -183,6 +183,7 @@ export function WorkflowToolsDialog({
           setLoading(false);
           return;
         }
+        iconUrl = uploadResult;
       }
       const toolData = {
         name: name.trim(),
@@ -442,9 +443,12 @@ export function WorkflowToolsDialog({
                                   />
                                 ) : tool.icon &&
                                   ICON_OPTIONS.includes(tool.icon) ? (
-                                  React.createElement(LucideIcons[tool.icon], {
-                                    className: "h-5 w-5 mr-2",
-                                  })
+                                  React.createElement(
+                                    (LucideIcons as any)[tool.icon],
+                                    {
+                                      className: "h-5 w-5 mr-2",
+                                    }
+                                  )
                                 ) : (
                                   <Wrench className="h-5 w-5 mr-2" />
                                 )}
