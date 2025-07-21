@@ -39,6 +39,7 @@ import {
 } from "@/lib/data-service";
 import { useToast } from "@/components/ui/use-toast";
 import { exportWorkflows } from "@/lib/export-service";
+import { DeleteConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface WorkflowsTableProps {
   groups: Group[];
@@ -71,6 +72,8 @@ export default function WorkflowsTable({
   const [taskFilter, setTaskFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tools, setTools] = useState<any[]>([]);
+  const [deleteWorkflow, setDeleteWorkflow] = useState<Workflow | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch workflows on component mount
@@ -115,18 +118,26 @@ export default function WorkflowsTable({
     return matchesSearch && matchesTask && matchesStatus;
   });
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (workflow: Workflow) => {
     if (!isAdmin) return;
+    setDeleteWorkflow(workflow);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteWorkflow) return;
 
     try {
-      const success = await deleteWorkflow(id);
+      const success = await deleteWorkflow(deleteWorkflow.id);
       if (success) {
-        setWorkflows(workflows.filter((w) => w.id !== id));
+        setWorkflows(workflows.filter((w) => w.id !== deleteWorkflow.id));
         toast({
           title: "Success",
           description: "Workflow deleted successfully",
         });
         onDataChange?.();
+        setDeleteWorkflow(null);
+        setDeleteDialogOpen(false);
       }
     } catch (error) {
       console.error("Error deleting workflow:", error);
@@ -347,7 +358,7 @@ export default function WorkflowsTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDelete(workflow.id)}
+                                onClick={() => handleDelete(workflow)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -364,6 +375,17 @@ export default function WorkflowsTable({
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation */}
+      {deleteWorkflow && (
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={confirmDelete}
+          itemName={deleteWorkflow.name}
+          itemType="workflow"
+        />
+      )}
     </div>
   );
 }

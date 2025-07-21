@@ -213,9 +213,7 @@ export function WorkflowDialog({
         await loadData();
         toast({
           title: "Success",
-          description: `Workflow ${
-            workflow.isActive ? "deactivated" : "activated"
-          } successfully.`,
+          description: `Workflow ${workflow.isActive ? "deactivated" : "activated"} successfully.`,
         });
       }
     } catch (error) {

@@ -396,10 +396,116 @@ export default function ResponsibilityChart({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading analytics...</p>
+      <div className="p-6 space-y-6 h-full">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="w-48 h-8 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-64 h-4 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={`stat-${i}`}
+              className="p-4 border border-gray-200 rounded-lg"
+            >
+              <div className="space-y-2">
+                <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
+          {/* Chart 1 */}
+          <div className="p-6 border border-gray-200 rounded-lg">
+            <div className="mb-6">
+              <div className="w-48 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="relative h-64">
+              <div className="h-full bg-gray-100 rounded animate-pulse"></div>
+            </div>
+            <div className="flex gap-4 mt-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={`legend-${i}`} className="flex items-center gap-2">
+                  <div className="h-3 w-3 bg-gray-200 rounded-full animate-pulse"></div>
+                  <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Chart 2 */}
+          <div className="p-6 border border-gray-200 rounded-lg">
+            <div className="mb-6">
+              <div className="w-40 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="w-28 h-4 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="relative h-64">
+              <div className="flex items-center justify-center h-full">
+                <div className="h-40 w-40 bg-gray-100 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-4 justify-center">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={`legend-${i}`} className="flex items-center gap-2">
+                  <div className="h-3 w-3 bg-gray-200 rounded-full animate-pulse"></div>
+                  <div className="h-3 w-16 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {Array.from({ length: 2 }).map((_, chartIndex) => (
+            <div
+              key={`chart-${chartIndex}`}
+              className="p-6 border border-gray-200 rounded-lg"
+            >
+              <div className="mb-6">
+                <div className="w-44 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="w-36 h-4 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div className="relative h-64">
+                <div className="h-full w-full relative">
+                  {/* Y-axis labels */}
+                  <div className="absolute left-0 top-0 h-full flex flex-col justify-between py-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={`y-${i}`}
+                        className="h-3 w-8 bg-gray-200 rounded animate-pulse"
+                      ></div>
+                    ))}
+                  </div>
+
+                  {/* Chart bars */}
+                  <div className="ml-12 h-full flex items-end gap-2">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div
+                        key={`bar-${i}`}
+                        className="flex-1 flex flex-col items-center gap-2"
+                      >
+                        <div
+                          className="w-full bg-gray-200 rounded animate-pulse"
+                          style={{ height: `${Math.random() * 60 + 20}%` }}
+                        ></div>
+                        <div className="h-3 w-8 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

@@ -26,6 +26,7 @@ import {
   Calendar,
   ChevronDown,
   Download,
+  Activity,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
@@ -35,8 +36,10 @@ import { SimpleTaskDialog } from "@/components/simple-task-dialog";
 import { WorkflowDialog } from "@/components/workflow-dialog";
 import DraggableChatModal from "@/components/draggable-chat-modal";
 import HowToUseButton from "@/components/how-to-use-button";
+import HowToUseModal from "@/components/how-to-use-modal";
 import NotificationBell from "@/components/notification-bell";
 import { useAuth } from "@/contexts/auth-context";
+import dynamic from "next/dynamic";
 import type {
   Person,
   Category,
@@ -49,10 +52,55 @@ import OrgChart from "@/components/org-chart";
 import GroupsTable from "@/components/groups-table";
 import CategoriesTable from "@/components/categories-table";
 import PeopleTable from "@/components/people-table";
-import ResponsibilityChart from "@/components/responsibility-chart";
 import TasksView from "@/components/tasks-view";
 import WorkflowsTable from "@/components/workflows-table";
 import CalendarView from "@/components/calendar-view";
+
+// Lazy load the ResponsibilityChart for better performance
+const ResponsibilityChart = dynamic(
+  () => import("@/components/responsibility-chart"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-6 space-y-6 h-96">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="w-48 h-8 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-64 h-4 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={`stat-${i}`}
+              className="p-4 border border-gray-200 rounded-lg"
+            >
+              <div className="space-y-2">
+                <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart Placeholder */}
+        <div className="p-6 border border-gray-200 rounded-lg">
+          <div className="mb-6">
+            <div className="w-48 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="relative h-64">
+            <div className="h-full bg-gray-100 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    ),
+  }
+);
 
 import {
   fetchGroups,
@@ -81,6 +129,10 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { exportAllData } from "@/lib/export-service";
+import { initializeAdminUsers } from "@/lib/init-admin";
+import EnhancedAnalytics from "@/components/enhanced-analytics";
+import ActivityFeed from "@/components/activity-feed";
+import CollaborationIndicators from "@/components/collaboration-indicators";
 
 export default function Dashboard() {
   // State variables
@@ -93,7 +145,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dbInitialized, setDbInitialized] = useState(false);
   const [initializingDb, setInitializingDb] = useState(false);
-  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0); // Trigger for data refresh
+  // Trigger for data refresh
+  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
 
   // Export handler for all data
   const handleExportAll = async () => {
@@ -152,6 +205,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("orgchart");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [howToUseModalOpen, setHowToUseModalOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null
   );
@@ -162,6 +216,42 @@ export default function Dashboard() {
 
   const { toast } = useToast();
   const { logout, isAdmin, userRole, userId, userEmail } = useAuth();
+
+  // Keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if ? key is pressed (Shift + / in most layouts)
+      if (
+        event.key === "?" &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        // Prevent default behavior
+        event.preventDefault();
+
+        // Don't trigger if user is typing in an input field
+        const activeElement = document.activeElement;
+        const isTyping =
+          activeElement &&
+          (activeElement.tagName === "INPUT" ||
+            activeElement.tagName === "TEXTAREA" ||
+            activeElement.getAttribute("contenteditable") === "true");
+
+        if (!isTyping) {
+          setHowToUseModalOpen(true);
+        }
+      }
+    };
+
+    // Add event listener
+    document.addEventListener("keydown", handleKeyDown);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -175,13 +265,14 @@ export default function Dashboard() {
   const handleViewWorkflow = (workflow: any) => {
     // Find the task associated with this workflow
     const task = tasks.find((t) => t.id === workflow.taskId);
+
     if (task) {
       setSelectedWorkflowForDialog({ workflow, task });
       setWorkflowDialogOpen(true);
     } else {
       toast({
         title: "Error",
-        description: "Could not find the task associated with this workflow.",
+        description: `Could not find the task associated with this workflow. Task ID: ${workflow.taskId}`,
         variant: "destructive",
       });
     }
@@ -196,7 +287,7 @@ export default function Dashboard() {
     } else {
       toast({
         title: "Error",
-        description: "Could not find the task associated with this workflow.",
+        description: `Could not find the task associated with this workflow. Task ID: ${workflow.taskId}`,
         variant: "destructive",
       });
     }
@@ -216,6 +307,9 @@ export default function Dashboard() {
         // First try to ensure tables exist
         const tablesExist = await ensureTablesExist();
         setDbInitialized(tablesExist);
+
+        // Initialize admin users from hardcoded list
+        await initializeAdminUsers();
 
         if (tablesExist) {
           // If tables exist, fetch data
@@ -626,10 +720,116 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading data...</p>
+      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
+          <div className="flex justify-between items-center px-4 py-3">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-bold text-gray-900 hidden sm:block">
+                Land iQ - Project Management
+              </h1>
+              <h1 className="text-lg font-bold text-gray-900 sm:hidden">
+                Land iQ - Project Management
+              </h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-20 h-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar Navigation */}
+          <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex-shrink-0 hidden sm:flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <div className="w-20 h-4 bg-gray-200 rounded animate-pulse mb-4"></div>
+              <div className="space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex items-center px-3 py-2">
+                    <div className="w-4 h-4 bg-gray-200 rounded animate-pulse mr-3"></div>
+                    <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile tabs */}
+          <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
+            <div className="flex justify-around">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center py-2 px-3">
+                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse mb-1"></div>
+                  <div className="w-8 h-3 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Main content area */}
+          <div className="flex-1 overflow-hidden bg-white w-full">
+            <div className="p-6 space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="p-4 border border-gray-200 rounded-lg"
+                  >
+                    <div className="space-y-2">
+                      <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-12 h-8 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Main Chart Area */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="p-6 border border-gray-200 rounded-lg">
+                  <div className="mb-6">
+                    <div className="w-32 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+                    <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
+                </div>
+                <div className="p-6 border border-gray-200 rounded-lg">
+                  <div className="mb-6">
+                    <div className="w-28 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+                    <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="border border-gray-200 rounded-lg">
+                <div className="p-4 border-b border-gray-200">
+                  <div className="w-32 h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="space-y-1">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex gap-4 p-4 border-b border-gray-100"
+                    >
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <div
+                          key={j}
+                          className={`h-4 bg-gray-200 rounded animate-pulse ${
+                            j === 0 ? "w-1/4" : "flex-1"
+                          }`}
+                        ></div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -668,319 +868,462 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between w-full">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Land iQ - Project Management
-          </h1>
-          <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-            {userRole?.toUpperCase()}
+      <div className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
+        <div className="flex justify-between items-center px-4 py-3">
+          <div className="flex items-center space-x-4">
+            <div className="hidden sm:block">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-600 to-gray-900 bg-clip-text text-transparent animate-shimmer transition-all duration-300 cursor-default bg-[length:200%_100%]">
+                Land iQ - Project Management
+              </h1>
+              <CollaborationIndicators className="mt-1" people={people} />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-600 to-gray-900 bg-clip-text text-transparent animate-shimmer transition-all duration-300 cursor-default bg-[length:200%_100%] sm:hidden">
+              Land iQ - Project Management
+            </h1>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <NotificationBell />
+            <HowToUseButton />
+            <Button
+              onClick={() => setChatModalOpen(true)}
+              variant="outline"
+              size="sm"
+              className="hidden sm:flex bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Chat
+            </Button>
+
+            {/* Mobile menu button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-4 w-4" />
+              ) : (
+                <Menu className="h-4 w-4" />
+              )}
+            </Button>
+
+            {/* Desktop Export/Logout */}
+            <div className="hidden sm:flex items-center space-x-2">
+              <Button
+                onClick={handleExportAll}
+                variant="outline"
+                size="sm"
+                className="bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export All
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          {/* Quick Add Dropdown - Only show if admin */}
-          {isAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  className="bg-black text-white hover:bg-gray-800 transition-colors"
-                  size="sm"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Quick Add
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => setAllocationDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <ListPlus className="mr-2 h-4 w-4" />
-                  Add Allocation
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setCategoryDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Category
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setGroupDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <Layers className="mr-2 h-4 w-4" />
-                  Add Group
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setPersonDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add Person
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setTaskDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <CheckSquare className="mr-2 h-4 w-4" />
-                  Add Task
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setWorkflowDialogOpen(true)}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <GitBranch className="mr-2 h-4 w-4" />
-                  Add Workflow
-                </DropdownMenuItem>
-                <div className="border-t my-1"></div>
-                <DropdownMenuItem
-                  onClick={handleExportAll}
-                  className="hover:bg-gray-100 hover:text-gray-900 cursor-pointer transition-colors"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export All Data
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
 
-          {/* Chat Button - Available to all authenticated users */}
-          <Button
-            onClick={() => setChatModalOpen(true)}
-            className="bg-black text-white hover:bg-gray-800 transition-colors"
-            size="sm"
-          >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Chat
-          </Button>
-
-          {/* Notification Bell - Available to all authenticated users */}
-          <NotificationBell />
-
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="bg-black text-white border-black hover:bg-gray-800 hover:border-gray-800 transition-colors"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      {/* Custom Tab Navigation */}
-      <div className="border-b border-gray-200 bg-white w-full">
-        <div className="flex overflow-x-auto scrollbar-hide w-full">
-          <button
-            onClick={() => setActiveTab("orgchart")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "orgchart"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <Grid3X3 className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-            <span className="sm:hidden">Chart</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("groups")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "groups"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <Layers className="mr-2 h-4 w-4" />
-            Groups
-          </button>
-          <button
-            onClick={() => setActiveTab("categories")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "categories"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <Layers className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Categories</span>
-            <span className="sm:hidden">Cats</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("people")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "people"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <Users className="mr-2 h-4 w-4" />
-            People
-          </button>
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "tasks"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <CheckSquare className="mr-2 h-4 w-4" />
-            Tasks
-          </button>
-          <button
-            onClick={() => setActiveTab("workflows")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "workflows"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <GitBranch className="mr-2 h-4 w-4" />
-            Workflows
-          </button>
-          <button
-            onClick={() => setActiveTab("analytics")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "analytics"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <BarChart className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Analytics</span>
-            <span className="sm:hidden">Stats</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("calendar")}
-            className={cn(
-              "flex items-center py-3 px-4 text-sm font-medium rounded-none border-b-2 transition-colors whitespace-nowrap min-w-fit",
-              activeTab === "calendar"
-                ? "border-black text-black"
-                : "border-transparent text-gray-600 hover:text-black hover:border-gray-300"
-            )}
-          >
-            <Calendar className="mr-2 h-4 w-4" />
-            Calendar
-          </button>
-        </div>
+        {/* Mobile dropdown menu */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-gray-200 bg-white p-4 space-y-2">
+            <Button
+              onClick={() => setChatModalOpen(true)}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Chat
+            </Button>
+            <Button
+              onClick={handleExportAll}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export All
+            </Button>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="w-full justify-start bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden bg-white w-full">
-        {activeTab === "orgchart" && (
-          <div className="h-full w-full">
-            <OrgChart
-              groups={groups}
-              categories={categories}
-              people={people}
-              allocations={allocations}
-              onDeleteAllocation={isAdmin ? deleteAllocationHandler : () => {}}
-              onAddGroup={isAdmin ? () => setGroupDialogOpen(true) : () => {}}
-              onAddCategory={
-                isAdmin ? () => setCategoryDialogOpen(true) : () => {}
-              }
-              onAddAllocation={
-                isAdmin ? () => setAllocationDialogOpen(true) : () => {}
-              }
-              onCategoryClick={isAdmin ? handleCategoryClick : () => {}}
-            />
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar Navigation */}
+        <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex-shrink-0 hidden sm:flex flex-col">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="font-semibold text-gray-800 mb-4">Navigation</h2>
+            <nav className="space-y-2">
+              <button
+                onClick={() => setActiveTab("orgchart")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "orgchart"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Grid3X3 className="mr-3 h-4 w-4" />
+                Org Chart
+              </button>
+              <button
+                onClick={() => setActiveTab("groups")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "groups"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Layers className="mr-3 h-4 w-4" />
+                Groups
+              </button>
+              <button
+                onClick={() => setActiveTab("categories")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "categories"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Database className="mr-3 h-4 w-4" />
+                Categories
+              </button>
+              <button
+                onClick={() => setActiveTab("people")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "people"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Users className="mr-3 h-4 w-4" />
+                People
+              </button>
+              <button
+                onClick={() => setActiveTab("tasks")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "tasks"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <CheckSquare className="mr-3 h-4 w-4" />
+                Tasks
+              </button>
+              <button
+                onClick={() => setActiveTab("workflows")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "workflows"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <GitBranch className="mr-3 h-4 w-4" />
+                Workflows
+              </button>
+              <button
+                onClick={() => setActiveTab("analytics")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "analytics"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <BarChart className="mr-3 h-4 w-4" />
+                Analytics
+              </button>
+              <button
+                onClick={() => setActiveTab("activity")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "activity"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Activity className="mr-3 h-4 w-4" />
+                Activity
+              </button>
+              <button
+                onClick={() => setActiveTab("calendar")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "calendar"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Calendar className="mr-3 h-4 w-4" />
+                Calendar
+              </button>
+            </nav>
           </div>
-        )}
 
-        {activeTab === "groups" && (
-          <div className="h-full w-full">
-            <GroupsTable
-              groups={groups}
-              onEdit={isAdmin ? updateGroupHandler : () => {}}
-              onDelete={isAdmin ? deleteGroupHandler : () => {}}
-            />
-          </div>
-        )}
+          {/* Admin Quick Actions */}
+          {isAdmin && (
+            <div className="p-4 border-t border-gray-200 flex-1">
+              <h3 className="font-medium text-gray-800 mb-3">Quick Actions</h3>
+              <div className="space-y-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-between"
+                    >
+                      <div className="flex items-center">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New
+                      </div>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56">
+                    <DropdownMenuItem onClick={() => setGroupDialogOpen(true)}>
+                      <Layers className="mr-2 h-4 w-4" />
+                      Add Group
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setCategoryDialogOpen(true)}
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      Add Category
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPersonDialogOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Person
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setAllocationDialogOpen(true)}
+                    >
+                      <ListPlus className="mr-2 h-4 w-4" />
+                      Add Allocation
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTaskDialogOpen(true)}>
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                      Add Task
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
+        </div>
 
-        {activeTab === "categories" && (
-          <div className="h-full w-full">
-            <CategoriesTable
-              categories={categories}
-              groups={groups}
-              onEdit={isAdmin ? updateCategoryHandler : () => {}}
-              onDelete={isAdmin ? deleteCategoryHandler : () => {}}
-            />
+        {/* Mobile tabs */}
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
+          <div className="flex justify-around">
+            {[
+              { key: "orgchart", icon: Grid3X3, label: "Chart" },
+              { key: "people", icon: Users, label: "People" },
+              { key: "tasks", icon: CheckSquare, label: "Tasks" },
+              { key: "analytics", icon: BarChart, label: "Analytics" },
+              { key: "activity", icon: Activity, label: "Activity" },
+            ].map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={cn(
+                  "flex flex-col items-center py-2 px-3 text-xs",
+                  activeTab === key ? "text-blue-600" : "text-gray-500"
+                )}
+              >
+                <Icon className="h-5 w-5 mb-1" />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
-        {activeTab === "people" && (
-          <div className="h-full w-full">
-            <PeopleTable
-              people={people}
-              onEdit={isAdmin ? updatePersonHandler : () => {}}
-              onDelete={isAdmin ? deletePersonHandler : () => {}}
-            />
-          </div>
-        )}
+        {/* Main content area */}
+        <div className="flex-1 overflow-hidden bg-white w-full">
+          {activeTab === "orgchart" && (
+            <div className="h-full w-full">
+              <OrgChart
+                groups={groups}
+                categories={categories}
+                people={people}
+                allocations={allocations}
+                onDeleteAllocation={
+                  isAdmin ? deleteAllocationHandler : () => {}
+                }
+                onAddGroup={isAdmin ? () => setGroupDialogOpen(true) : () => {}}
+                onAddCategory={
+                  isAdmin ? () => setCategoryDialogOpen(true) : () => {}
+                }
+                onAddAllocation={
+                  isAdmin ? () => setAllocationDialogOpen(true) : () => {}
+                }
+                onCategoryClick={isAdmin ? handleCategoryClick : () => {}}
+              />
+            </div>
+          )}
 
-        {activeTab === "tasks" && (
-          <div className="h-full w-full">
-            <TasksView
-              groups={groups}
-              categories={categories}
-              people={people}
-              isAdmin={isAdmin}
-              selectedCategoryId={selectedCategoryId}
-              onDataChange={refreshData}
-            />
-          </div>
-        )}
+          {activeTab === "groups" && (
+            <div className="h-full w-full">
+              <GroupsTable
+                groups={groups}
+                onEdit={isAdmin ? updateGroupHandler : () => {}}
+                onDelete={isAdmin ? deleteGroupHandler : () => {}}
+              />
+            </div>
+          )}
 
-        {activeTab === "workflows" && (
-          <div className="h-full w-full">
-            <WorkflowsTable
-              groups={groups}
-              categories={categories}
-              tasks={tasks}
-              people={people}
-              isAdmin={isAdmin}
-              onDataChange={refreshData}
-              onView={handleViewWorkflow}
-              onEdit={handleEditWorkflow}
-              onCreateNew={handleCreateNewWorkflow}
-            />
-          </div>
-        )}
+          {activeTab === "categories" && (
+            <div className="h-full w-full">
+              <CategoriesTable
+                categories={categories}
+                groups={groups}
+                onEdit={isAdmin ? updateCategoryHandler : () => {}}
+                onDelete={isAdmin ? deleteCategoryHandler : () => {}}
+              />
+            </div>
+          )}
 
-        {activeTab === "analytics" && (
-          <div className="h-full w-full">
-            <ResponsibilityChart people={people} allocations={allocations} />
-          </div>
-        )}
+          {activeTab === "people" && (
+            <div className="h-full w-full">
+              <PeopleTable
+                people={people}
+                onEdit={isAdmin ? updatePersonHandler : () => {}}
+                onDelete={isAdmin ? deletePersonHandler : () => {}}
+              />
+            </div>
+          )}
 
-        {activeTab === "calendar" && (
-          <div className="h-full w-full">
-            <CalendarView
-              people={people}
-              groups={groups}
-              tasks={tasks}
-              taskAllocations={taskAllocations}
-              categories={categories}
-              allocations={allocations}
-              currentUserId={userId || undefined}
-              currentUserEmail={userEmail || undefined}
-              isAdmin={isAdmin}
-            />
-          </div>
-        )}
+          {activeTab === "tasks" && (
+            <div className="h-full w-full">
+              <TasksView
+                groups={groups}
+                categories={categories}
+                people={people}
+                isAdmin={isAdmin}
+                selectedCategoryId={selectedCategoryId}
+                onDataChange={refreshData}
+              />
+            </div>
+          )}
+
+          {activeTab === "workflows" && (
+            <div className="h-full w-full">
+              <WorkflowsTable
+                groups={groups}
+                categories={categories}
+                tasks={tasks}
+                people={people}
+                isAdmin={isAdmin}
+                onDataChange={refreshData}
+                onView={handleViewWorkflow}
+                onEdit={handleEditWorkflow}
+                onCreateNew={handleCreateNewWorkflow}
+              />
+            </div>
+          )}
+
+          {activeTab === "analytics" && (
+            <div className="h-full w-full">
+              <EnhancedAnalytics
+                people={people}
+                allocations={allocations}
+                tasks={tasks}
+                groups={groups}
+                categories={categories}
+              />
+            </div>
+          )}
+
+          {activeTab === "activity" && (
+            <div className="h-full w-full p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                <div className="lg:col-span-2">
+                  <ActivityFeed
+                    className="h-full"
+                    people={people}
+                    groups={groups}
+                    tasks={tasks}
+                    categories={categories}
+                  />
+                </div>
+                <div className="space-y-6">
+                  <CollaborationIndicators
+                    className="p-4 bg-white rounded-lg border"
+                    showActivityDetails={true}
+                    maxVisible={8}
+                    people={people}
+                  />
+                  <div className="bg-white rounded-lg border p-4">
+                    <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Users:</span>
+                        <span className="font-medium">{people.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Active Groups:</span>
+                        <span className="font-medium">{groups.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Tasks:</span>
+                        <span className="font-medium">{tasks.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Total Allocations:
+                        </span>
+                        <span className="font-medium">
+                          {allocations.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "calendar" && (
+            <div className="h-full w-full">
+              <CalendarView
+                people={people}
+                groups={groups}
+                tasks={tasks}
+                taskAllocations={taskAllocations}
+                categories={categories}
+                allocations={allocations}
+                currentUserId={userId || undefined}
+                currentUserEmail={userEmail || undefined}
+                isAdmin={isAdmin}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Admin-only Dialogs */}
@@ -1024,18 +1367,22 @@ export default function Dashboard() {
             existingAllocations={[]}
           />
 
-          {workflowDialogOpen && (
-            <WorkflowDialog
-              open={workflowDialogOpen}
-              onOpenChange={setWorkflowDialogOpen}
-              task={selectedWorkflowForDialog?.task}
-              people={people}
-              workflow={selectedWorkflowForDialog?.workflow}
-              isCreateMode={!selectedWorkflowForDialog}
-            />
-          )}
+          <WorkflowDialog
+            open={workflowDialogOpen}
+            onOpenChange={setWorkflowDialogOpen}
+            task={selectedWorkflowForDialog?.task}
+            people={people}
+            workflow={selectedWorkflowForDialog?.workflow}
+            isCreateMode={!selectedWorkflowForDialog}
+          />
         </>
       )}
+
+      {/* How to Use Modal */}
+      <HowToUseModal
+        open={howToUseModalOpen}
+        onOpenChange={setHowToUseModalOpen}
+      />
 
       {/* Chat Modal - Available to all authenticated users */}
       <DraggableChatModal

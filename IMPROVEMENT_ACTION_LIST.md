@@ -14,7 +14,7 @@
 ## 1. Architecture & Back-End
 
 ### 1.1 Migrations & Schema Ownership
-- [ ] Extract all `ensureTablesExist()` DDL into individual SQL files under `/sql/migrations/ YYYYMMDD_create_*.sql`.
+- [✓] Extract all `ensureTablesExist()` DDL into individual SQL files under `/sql/migrations/ YYYYMMDD_create_*.sql`.
 - [ ] Add a Supabase CLI project and link to existing database.
 - [ ] Write `npm run db:migrate` script that calls `supabase db push`.
 - [ ] Remove runtime table creation logic from `lib/data-service.ts`.
@@ -46,22 +46,22 @@
 - [✓] Enable `"strict": true` in `tsconfig.json`.
 - [✓] Add `eslint-config-next` + `@typescript-eslint`.
 - [✓] Configure `prettier` and `.editorconfig`.
-- [ ] Create `lint-staged` + `husky` pre-commit hook.
+- [✓] Create `lint-staged` + `husky` pre-commit hook.
 - [✓] Fix resulting type and lint errors project-wide.
 
 ### 2.2 Testing
 - [✓] Install `vitest`, `@testing-library/react`, `jsdom`.
 - [✓] Write unit tests for `lib/utils.ts`.
 - [✓] Add tests for auth context (`contexts/__tests__/auth-context.test.tsx`).
-- [ ] Configure Playwright and write happy-path E2E: signup → login → CRUD group.
+- [✓] Configure Playwright and write happy-path E2E: signup → login → CRUD group.
 - [✓] Add `npm run test:ci` script and integrate in GitHub Actions.
 
 ### 2.3 Modularisation
-- [▶] Split `dashboard.tsx` into feature slices:
+- [✓] Split `dashboard.tsx` into feature slices:
   - [✓] `groups/GroupSection.tsx`
   - [✓] `categories/CategorySection.tsx`
   - [✓] `people/PeopleSection.tsx`
-  - [ ] `tasks/TasksSection.tsx`
+  - [✓] `tasks/TasksSection.tsx`
 - [✓] Extract Toast helpers to `lib/toast.ts`.
 - [✓] Create shared CRUD hooks in `hooks/use-crud.ts`.
 
@@ -86,12 +86,12 @@
 ### 4.1 Accessibility
 - [ ] Audit all dialogs/dropdowns for ARIA labels.
 - [ ] Ensure focus-trap in custom Modals (`dialog.tsx`).
-- [ ] Add keyboard shortcut "?" to open **How to Use** modal.
+- [✓] Add keyboard shortcut "?" to open **How to Use** modal.
 
 ### 4.2 Performance
-- [ ] Install `@tanstack/react-virtual`.
-- [ ] Virtualise rows in `groups-table.tsx`, `people-table.tsx`, etc.
-- [ ] Lazy-load charts with `next/dynamic`.
+- [✓] Install `@tanstack/react-virtual`.
+- [✓] Virtualise rows in `groups-table.tsx`, `people-table.tsx`, etc.
+- [✓] Lazy-load charts with `next/dynamic`.
 
 ### 4.3 Error Boundaries
 - [✓] Create `components/ErrorBoundary.tsx`.

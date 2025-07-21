@@ -38,6 +38,7 @@ import {
   exportResponsibilityMatrix,
   exportAllocations,
 } from "@/lib/export-service";
+import { OrgChartSkeleton } from "@/components/ui/enhanced-skeleton";
 import {
   DndContext,
   closestCenter,
@@ -251,6 +252,7 @@ export default function OrgChart({
   const [allTasksData, setAllTasksData] = useState<{
     [categoryId: string]: { tasks: Task[]; allocations: TaskAllocation[] };
   }>({});
+  const [loading, setLoading] = useState(true);
 
   // State for drag and drop ordering
   const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
@@ -291,6 +293,22 @@ export default function OrgChart({
     setHighlightedCategory(null);
     setHighlightedOrg(null);
   }, [categories, groups]);
+
+  // Set loading to false when we have basic data
+  useEffect(() => {
+    // Consider data loaded when we have groups, categories, people, or allocations
+    const hasData =
+      groups.length > 0 ||
+      categories.length > 0 ||
+      people.length > 0 ||
+      allocations.length > 0;
+    setLoading(
+      !hasData &&
+        groups.length === 0 &&
+        categories.length === 0 &&
+        people.length === 0
+    );
+  }, [groups.length, categories.length, people.length, allocations.length]);
 
   // Load all tasks and task allocations when component mounts or categories change
   useEffect(() => {
@@ -577,6 +595,11 @@ export default function OrgChart({
     const Icon = (LucideIcons as any)[iconName];
     return Icon ? Icon : (LucideIcons as any)["Folder"];
   };
+
+  // Show skeleton while loading
+  if (loading) {
+    return <OrgChartSkeleton />;
+  }
 
   return (
     <TooltipProvider>

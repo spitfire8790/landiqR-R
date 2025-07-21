@@ -103,7 +103,7 @@ export default function TasksView({
   selectedCategoryId: initialSelectedCategoryId,
   onDataChange,
 }: TasksViewProps) {
-  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState("all");
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -129,6 +129,23 @@ export default function TasksView({
   const [workflowTask, setWorkflowTask] = useState<Task | null>(null);
 
   const { toast } = useToast();
+
+  // Debug logging
+  useEffect(() => {
+    console.log("TasksView received props:", {
+      groupsCount: groups.length,
+      categoriesCount: categories.length,
+      peopleCount: people.length,
+      isAdmin,
+      selectedCategoryId: initialSelectedCategoryId,
+    });
+  }, [
+    groups.length,
+    categories.length,
+    people.length,
+    isAdmin,
+    initialSelectedCategoryId,
+  ]);
 
   // Handle initial category selection from prop
   useEffect(() => {
@@ -173,8 +190,8 @@ export default function TasksView({
       loadTasksForCategory(selectedCategoryId);
       loadAvailablePeople(selectedCategoryId);
     } else {
-      setTasks([]);
-      setTaskAllocations({});
+      // Initial load - show all tasks if no category is selected yet
+      loadTasksForCategory();
       setAvailablePeople([]);
     }
   }, [selectedCategoryId, selectedGroupId]);
@@ -186,16 +203,26 @@ export default function TasksView({
       const tasksData = await fetchTasksByCategory(categoryId);
       console.log(`Fetched ${tasksData.length} tasks:`, tasksData);
 
-      // Load allocations for each task
+      // Load allocations for each task (but handle empty tasks list)
       const allocationsData: Record<string, TaskAllocation[]> = {};
 
-      for (const task of tasksData) {
-        const allocations = await fetchTaskAllocations(task.id);
-        console.log(
-          `Fetched ${allocations.length} allocations for task ${task.id}:`,
-          allocations
-        );
-        allocationsData[task.id] = allocations;
+      if (tasksData.length > 0) {
+        for (const task of tasksData) {
+          try {
+            const allocations = await fetchTaskAllocations(task.id);
+            console.log(
+              `Fetched ${allocations.length} allocations for task ${task.id}:`,
+              allocations
+            );
+            allocationsData[task.id] = allocations;
+          } catch (allocationError) {
+            console.error(
+              `Error loading allocations for task ${task.id}:`,
+              allocationError
+            );
+            allocationsData[task.id] = []; // Default to empty array on error
+          }
+        }
       }
 
       // Update both states at once to ensure consistent UI
@@ -210,6 +237,9 @@ export default function TasksView({
       setForceUpdate((prev) => prev + 1);
     } catch (error) {
       console.error("Error loading tasks:", error);
+      // Still update state to empty to clear loading
+      setTasks([]);
+      setTaskAllocations({});
       toast({
         title: "Error",
         description: "Failed to load tasks. Please try again.",
@@ -230,6 +260,13 @@ export default function TasksView({
         (cat) => cat.groupId === groupId
       );
 
+      if (groupCategories.length === 0) {
+        console.log(`No categories found for group: ${groupId}`);
+        setTasks([]);
+        setTaskAllocations({});
+        return;
+      }
+
       // Load tasks for all categories in the group
       const tasksData = await Promise.all(
         groupCategories.map((cat) => fetchTasksByCategory(cat.id))
@@ -241,13 +278,23 @@ export default function TasksView({
       // Load allocations for each task
       const allocationsData: Record<string, TaskAllocation[]> = {};
 
-      for (const task of allTasks) {
-        const allocations = await fetchTaskAllocations(task.id);
-        console.log(
-          `Fetched ${allocations.length} allocations for task ${task.id}:`,
-          allocations
-        );
-        allocationsData[task.id] = allocations;
+      if (allTasks.length > 0) {
+        for (const task of allTasks) {
+          try {
+            const allocations = await fetchTaskAllocations(task.id);
+            console.log(
+              `Fetched ${allocations.length} allocations for task ${task.id}:`,
+              allocations
+            );
+            allocationsData[task.id] = allocations;
+          } catch (allocationError) {
+            console.error(
+              `Error loading allocations for task ${task.id}:`,
+              allocationError
+            );
+            allocationsData[task.id] = []; // Default to empty array on error
+          }
+        }
       }
 
       // Update both states at once to ensure consistent UI
@@ -262,6 +309,9 @@ export default function TasksView({
       setForceUpdate((prev) => prev + 1);
     } catch (error) {
       console.error("Error loading tasks for group:", error);
+      // Still update state to empty to clear loading
+      setTasks([]);
+      setTaskAllocations({});
       toast({
         title: "Error",
         description: "Failed to load tasks for group. Please try again.",
@@ -754,9 +804,16 @@ export default function TasksView({
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
-            Tasks & Responsibilities
-          </h2>
+          <div>
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900">
+              Tasks & Responsibilities
+            </h2>
+            {groups.length === 0 && (
+              <p className="text-sm text-orange-600">
+                No groups found. Add some groups first to create tasks.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Button
               onClick={() => exportTasks(tasks, categories, groups)}
@@ -860,7 +917,7 @@ export default function TasksView({
 
         {/* Add Task Button */}
         <div className="flex gap-2 mb-2">
-          {selectedCategoryId && selectedCategoryId !== "all" && (
+          {isAdmin && selectedCategoryId && selectedCategoryId !== "all" && (
             <Button
               onClick={() => {
                 setEditingTask(undefined);
@@ -890,19 +947,50 @@ export default function TasksView({
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-gray-50 w-full">
-        {!selectedCategoryId ? (
-          <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300 m-4">
-            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">
-              Select a category to view tasks
-            </p>
-            <p className="text-sm text-gray-400">
-              Choose from the dropdown above to get started
-            </p>
-          </div>
-        ) : loading ? (
-          <div className="text-center py-12 m-4">
-            <p className="text-gray-500">Loading tasks...</p>
+        {loading ? (
+          <div className="p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              {/* Loading Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="space-y-2">
+                  <div className="w-48 h-6 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="w-24 h-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+
+              {/* Loading Tasks */}
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-40 h-5 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="space-y-2 mb-3">
+                      <div className="w-full h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-3/4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="flex gap-2">
+                      {Array.from({
+                        length: 2 + Math.floor(Math.random() * 3),
+                      }).map((_, j) => (
+                        <div
+                          key={j}
+                          className="flex items-center gap-2 p-2 bg-gray-50 rounded border"
+                        >
+                          <div className="w-6 h-6 bg-gray-200 rounded-full animate-pulse"></div>
+                          <div className="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="p-4">

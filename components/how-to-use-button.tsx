@@ -14,7 +14,7 @@ export default function HowToUseButton() {
         onClick={() => setModalOpen(true)}
         variant="outline"
         size="sm"
-        className="bg-white-600 text-black border-black hover:bg-black hover:text-white hover:border-black transition-colors"
+        className="bg-black text-white border-black hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
       >
         <HelpCircle className="mr-2 h-4 w-4" />
         How to Use

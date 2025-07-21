@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, memo } from "react";
+import { useState, memo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Table,
   TableBody,
@@ -26,6 +27,11 @@ import {
 import { motion } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { exportGroups } from "@/lib/export-service";
+import {
+  DeleteConfirmationDialog,
+  BulkDeleteConfirmationDialog,
+} from "@/components/ui/confirmation-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface GroupsTableProps {
   groups: Group[];
@@ -42,27 +48,66 @@ const GroupsTable = memo(function GroupsTable({
   onDelete,
 }: GroupsTableProps) {
   const [editGroup, setEditGroup] = useState<Group | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteGroup, setDeleteGroup] = useState<Group | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [alertOpen, setAlertOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  // Virtualization refs
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const handleEdit = (group: Group) => {
     setEditGroup(group);
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setDeleteId(id);
-    setAlertOpen(true);
+  const handleDelete = (group: Group) => {
+    setDeleteGroup(group);
+    setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deleteId) {
-      onDelete(deleteId);
-      setDeleteId(null);
+    if (deleteGroup) {
+      onDelete(deleteGroup.id);
+      setDeleteGroup(null);
+      setDeleteDialogOpen(false);
     }
+  };
+
+  // Bulk selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedGroups(new Set(sortedGroups.map((group) => group.id)));
+    } else {
+      setSelectedGroups(new Set());
+    }
+  };
+
+  const handleSelectGroup = (groupId: string, checked: boolean) => {
+    const newSelected = new Set(selectedGroups);
+    if (checked) {
+      newSelected.add(groupId);
+    } else {
+      newSelected.delete(groupId);
+    }
+    setSelectedGroups(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedGroups.size > 0) {
+      setBulkDeleteDialogOpen(true);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    selectedGroups.forEach((groupId) => {
+      onDelete(groupId);
+    });
+    setSelectedGroups(new Set());
+    setBulkDeleteDialogOpen(false);
   };
 
   const handleSort = (field: SortField) => {
@@ -85,6 +130,14 @@ const GroupsTable = memo(function GroupsTable({
     }
   });
 
+  // Virtualization setup
+  const rowVirtualizer = useVirtualizer({
+    count: sortedGroups.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80, // Estimated row height
+    overscan: 5,
+  });
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
     return sortDirection === "asc" ? (
@@ -100,15 +153,28 @@ const GroupsTable = memo(function GroupsTable({
         <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
           Responsibility Groups
         </h2>
-        <Button
-          onClick={() => exportGroups(groups)}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedGroups.size > 0 && (
+            <Button
+              onClick={handleBulkDelete}
+              variant="destructive"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedGroups.size} selected
+            </Button>
+          )}
+          <Button
+            onClick={() => exportGroups(groups)}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
       <div className="flex-1 overflow-hidden p-2 sm:p-4 bg-gray-50 dark:bg-gray-900 w-full">
         {sortedGroups.length === 0 ? (
@@ -125,183 +191,209 @@ const GroupsTable = memo(function GroupsTable({
             </p>
           </motion.div>
         ) : (
-          <ScrollArea className="h-full w-full">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full">
-              {/* Mobile Card Layout */}
-              <div className="sm:hidden">
-                {sortedGroups.map((group, index) => (
-                  <motion.div
-                    key={group.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="border-b border-gray-200 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                          {group.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
-                          {group.description}
-                        </p>
-                      </div>
-                      <div className="flex space-x-1 ml-3">
-                        <motion.div
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(group)}
-                            className="touch-target dark:text-blue-400 dark:hover:bg-gray-600"
-                          >
-                            <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                        </motion.div>
-                        <motion.div
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(group.id)}
-                            className="touch-target dark:text-red-400 dark:hover:bg-gray-600"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </motion.div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Desktop Table Layout */}
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
-                    <TableRow>
-                      <TableHead
-                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
-                        onClick={() => handleSort("name")}
-                      >
-                        Name <SortIcon field="name" />
-                      </TableHead>
-                      <TableHead
-                        className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors bg-gray-100 dark:bg-gray-700"
-                        onClick={() => handleSort("description")}
-                      >
-                        Description <SortIcon field="description" />
-                      </TableHead>
-                      <TableHead className="w-[100px] font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedGroups.map((group, index) => (
-                      <motion.tr
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border dark:border-gray-700 w-full h-full">
+            {/* Mobile Card Layout */}
+            <div className="sm:hidden h-full">
+              <div
+                ref={parentRef}
+                className="h-full overflow-auto"
+                style={{
+                  contain: "strict",
+                }}
+              >
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: "100%",
+                    position: "relative",
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const group = sortedGroups[virtualItem.index];
+                    return (
+                      <motion.div
                         key={group.id}
+                        data-index={virtualItem.index}
+                        ref={rowVirtualizer.measureElement}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                        className="border-b border-gray-200 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
                       >
-                        <TableCell className="font-medium text-gray-900 dark:text-white">
-                          {group.name}
-                        </TableCell>
-                        <TableCell className="text-gray-700 dark:text-gray-300">
-                          {group.description}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                              {group.name}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                              {group.description}
+                            </p>
+                          </div>
+                          <div className="flex space-x-1 ml-3">
                             <motion.div
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                             >
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => handleEdit(group)}
-                                className="dark:hover:bg-gray-600"
+                                className="h-8 w-8 p-0"
                               >
-                                <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                <span className="sr-only">Edit</span>
+                                <Edit className="h-3 w-3" />
                               </Button>
                             </motion.div>
                             <motion.div
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                             >
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(group.id)}
-                                className="dark:hover:bg-gray-600"
+                                size="sm"
+                                onClick={() => handleDelete(group)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
                               >
-                                <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                <span className="sr-only">Delete</span>
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </motion.div>
                           </div>
-                        </TableCell>
-                      </motion.tr>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </ScrollArea>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden sm:block h-full overflow-hidden">
+              {/* Header with same grid structure */}
+              <div className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 sticky top-0 z-10">
+                <div
+                  className="grid gap-0 items-center px-4 py-3"
+                  style={{ gridTemplateColumns: "48px 192px 1fr 96px" }}
+                >
+                  {/* Checkbox Header */}
+                  <div className="flex items-center">
+                    <Checkbox
+                      checked={
+                        selectedGroups.size === sortedGroups.length &&
+                        sortedGroups.length > 0
+                      }
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all groups"
+                    />
+                  </div>
+
+                  {/* Name Header */}
+                  <div
+                    className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150 py-2 px-2 rounded -mx-2"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Name
+                      <SortIcon field="name" />
+                    </div>
+                  </div>
+
+                  {/* Description Header */}
+                  <div
+                    className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150 py-2 px-2 rounded -mx-2"
+                    onClick={() => handleSort("description")}
+                  >
+                    <div className="flex items-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Description
+                      <SortIcon field="description" />
+                    </div>
+                  </div>
+
+                  {/* Actions Header */}
+                  <div className="text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </div>
+                </div>
+              </div>
+              <div className="h-[calc(100%-64px)] overflow-auto">
+                {sortedGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="grid items-center gap-0 px-4 py-4 min-h-[60px] border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    style={{ gridTemplateColumns: "48px 192px 1fr 96px" }}
+                  >
+                    <div className="flex items-center">
+                      <Checkbox
+                        checked={selectedGroups.has(group.id)}
+                        onCheckedChange={(checked) =>
+                          handleSelectGroup(group.id, checked as boolean)
+                        }
+                        aria-label={`Select ${group.name}`}
+                      />
+                    </div>
+                    <div className="font-medium pr-4 truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                      {group.name}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-300 pr-4 truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                      {group.description}
+                    </div>
+                    <div className="flex justify-end space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(group)}
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(group)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {editGroup && (
-        <GroupDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSave={(updatedGroup) => {
-            onEdit({ ...updatedGroup, id: editGroup.id });
-            setEditGroup(null);
-          }}
-          defaultValues={editGroup}
+      {/* Edit Dialog */}
+      <GroupDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSave={onEdit}
+        group={editGroup}
+      />
+
+      {/* Delete Confirmation */}
+      {deleteGroup && (
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={confirmDelete}
+          itemName={deleteGroup.name}
+          itemType="group"
         />
       )}
 
-      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
-        <AlertDialogContent className="shadow-2xl border-none bg-white dark:bg-gray-800 dark:border-gray-700">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-xl font-bold text-gray-800 dark:text-white">
-                Are you sure?
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-600 dark:text-gray-300">
-                This will permanently delete this group and all its categories
-                and allocations.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="mt-4">
-              <AlertDialogCancel className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white transition-all duration-200">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-200 dark:neon-pink-glow"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </motion.div>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Bulk Delete Confirmation */}
+      <BulkDeleteConfirmationDialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        onConfirm={confirmBulkDelete}
+        count={selectedGroups.size}
+        itemType="group"
+      />
     </div>
   );
 });

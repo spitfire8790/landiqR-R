@@ -56,6 +56,20 @@ body {
     box-shadow: 0 0 5px theme("colors.purple.400"),
       0 0 10px theme("colors.purple.400"), 0 0 15px theme("colors.purple.400");
   }
+
+  /* Shimmer animation for shiny text effect */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 8s ease-in-out infinite;
+  }
 }
 
 @layer base {

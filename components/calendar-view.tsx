@@ -81,6 +81,7 @@ export default function CalendarView({
     setIsLoadingLeave(true);
     try {
       const data = await fetchLeave();
+      console.log("Calendar: Loaded leave data:", data.length, "records");
       setLeaveData(data);
     } catch (error) {
       console.error("Error loading leave data:", error);
@@ -97,6 +98,32 @@ export default function CalendarView({
   const currentUserPerson = currentUserEmail
     ? people.find((p) => p.email === currentUserEmail)
     : null;
+
+  // Debug logging for calendar data
+  useEffect(() => {
+    console.log("Calendar Debug Info:", {
+      currentUserEmail,
+      currentUserId,
+      currentUserPerson: currentUserPerson
+        ? {
+            id: currentUserPerson.id,
+            name: currentUserPerson.name,
+            email: currentUserPerson.email,
+          }
+        : null,
+      peopleCount: people.length,
+      leaveDataCount: leaveData.length,
+      isLoadingLeave,
+      peopleEmails: people.map((p) => p.email),
+    });
+  }, [
+    currentUserEmail,
+    currentUserId,
+    currentUserPerson,
+    people,
+    leaveData,
+    isLoadingLeave,
+  ]);
 
   // Handle new leave creation
   const handleLeaveCreated = async (newLeave: Leave) => {
