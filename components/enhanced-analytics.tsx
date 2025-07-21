@@ -76,8 +76,8 @@ export default function EnhancedAnalytics({
   const [selectedOrg, setSelectedOrg] = useState<string>("all");
   const [loading, setLoading] = useState(false);
 
-  // Get unique organizations
-  const organizations = useMemo(() => {
+  // Get unique organisations
+  const organisations = useMemo(() => {
     const orgs = new Set(people.map((p) => p.organisation));
     return Array.from(orgs);
   }, [people]);
@@ -117,8 +117,8 @@ export default function EnhancedAnalytics({
       filteredData.allocations.map((a) => a.categoryId)
     ).size;
 
-    // Calculate allocation by organization
-    const orgAllocations = organizations.map((org) => {
+    // Calculate allocation by organisation
+    const orgAllocations = organisations.map((org) => {
       const orgPeople = filteredData.people.filter(
         (p) => p.organisation === org
       );
@@ -147,7 +147,7 @@ export default function EnhancedAnalytics({
       orgAllocations,
       groupAllocations,
     };
-  }, [filteredData, organizations, groups, categories]);
+  }, [filteredData, organisations, groups, categories]);
 
   // Chart configurations
   const chartOptions = {
@@ -185,7 +185,7 @@ export default function EnhancedAnalytics({
     },
   };
 
-  // Organization chart data
+  // Organisation chart data
   const orgChartData = {
     labels: metrics.orgAllocations.map((item) => item.org),
     datasets: [
@@ -256,11 +256,11 @@ export default function EnhancedAnalytics({
 
           <Select value={selectedOrg} onValueChange={setSelectedOrg}>
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Organizations" />
+              <SelectValue placeholder="All Organisations" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Organizations</SelectItem>
-              {organizations.map((org) => (
+              <SelectItem value="all">All Organisations</SelectItem>
+              {organisations.map((org) => (
                 <SelectItem key={org} value={org}>
                   {org}
                 </SelectItem>
@@ -409,7 +409,7 @@ export default function EnhancedAnalytics({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5" />
-                  Allocations by Organization
+                  Allocations by Organisation
                 </CardTitle>
               </CardHeader>
               <CardContent>

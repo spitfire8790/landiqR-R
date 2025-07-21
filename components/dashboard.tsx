@@ -130,7 +130,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { exportAllData } from "@/lib/export-service";
 import { initializeAdminUsers } from "@/lib/init-admin";
-import EnhancedAnalytics from "@/components/enhanced-analytics";
+
 import ActivityFeed from "@/components/activity-feed";
 import CollaborationIndicators from "@/components/collaboration-indicators";
 
@@ -1249,13 +1249,7 @@ export default function Dashboard() {
 
           {activeTab === "analytics" && (
             <div className="h-full w-full">
-              <EnhancedAnalytics
-                people={people}
-                allocations={allocations}
-                tasks={tasks}
-                groups={groups}
-                categories={categories}
-              />
+              <ResponsibilityChart people={people} allocations={allocations} />
             </div>
           )}
 
