@@ -13,8 +13,7 @@
     "test:ci": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "type-check": "tsc --noEmit",
-    "prepare": "husky"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "latest",
@@ -51,8 +50,6 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@supabase/supabase-js": "latest",
     "@tanstack/react-virtual": "^3.13.12",
-    "chart.js": "^4.4.1",
-    "react-chartjs-2": "^5.2.0",
     "@xyflow/react": "^12.7.0",
     "autoprefixer": "^10.4.20",
     "chart.js": "^4.4.9",
@@ -92,21 +89,10 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
-    "husky": "^9.1.7",
     "jsdom": "^26.1.0",
-    "lint-staged": "^16.1.2",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5",
     "vitest": "^3.2.4"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "npx eslint --fix",
-      "npx prettier --write"
-    ],
-    "*.{json,css,md}": [
-      "npx prettier --write"
-    ]
   }
 }
