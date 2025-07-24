@@ -66,6 +66,7 @@ interface WorkflowDialogProps {
   people: Person[];
   workflow?: Workflow;
   isCreateMode?: boolean;
+  mode?: 'view' | 'edit';
 }
 
 export function WorkflowDialog({
@@ -75,6 +76,7 @@ export function WorkflowDialog({
   people,
   workflow,
   isCreateMode,
+  mode,
 }: WorkflowDialogProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [tools, setTools] = useState<WorkflowTool[]>([]);
@@ -94,6 +96,41 @@ export function WorkflowDialog({
       loadData();
     }
   }, [open, task?.id]);
+
+  // Initialize editing/viewing workflow based on the workflow prop and mode
+  useEffect(() => {
+    if (open && workflow && mode) {
+      // Check if we need to update the state (different workflow or different mode)
+      const isEditingCurrentWorkflow = editingWorkflow?.id === workflow.id;
+      const isViewingCurrentWorkflow = viewingWorkflow?.id === workflow.id;
+      const needsUpdate = !(
+        (mode === 'edit' && isEditingCurrentWorkflow) ||
+        (mode === 'view' && isViewingCurrentWorkflow)
+      );
+
+      if (needsUpdate) {
+        // Clear previous state and set based on mode
+        if (mode === 'edit') {
+          setEditingWorkflow(workflow);
+          setViewingWorkflow(undefined);
+        } else if (mode === 'view') {
+          setViewingWorkflow(workflow);
+          setEditingWorkflow(undefined);
+        }
+        setShowBuilder(true);
+      }
+    } else if (open && !workflow && isCreateMode) {
+      // Clear state for create mode
+      setEditingWorkflow(undefined);
+      setViewingWorkflow(undefined);
+      setShowBuilder(false);
+    } else if (!open) {
+      // Clear state when dialog closes
+      setEditingWorkflow(undefined);
+      setViewingWorkflow(undefined);
+      setShowBuilder(false);
+    }
+  }, [open, workflow, mode, isCreateMode]);
 
   const loadData = async () => {
     setLoading(true);

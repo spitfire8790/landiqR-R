@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -147,6 +147,10 @@ export default function Dashboard() {
   const [initializingDb, setInitializingDb] = useState(false);
   // Trigger for data refresh
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
+  
+  // Add refs to prevent redundant operations
+  const initializationAttempted = useRef(false);
+  const adminInitialized = useRef(false);
 
   // Export handler for all data
   const handleExportAll = async () => {
@@ -212,6 +216,7 @@ export default function Dashboard() {
   const [selectedWorkflowForDialog, setSelectedWorkflowForDialog] = useState<{
     workflow: any;
     task: Task;
+    mode: 'view' | 'edit';
   } | null>(null);
 
   const { toast } = useToast();
@@ -267,7 +272,7 @@ export default function Dashboard() {
     const task = tasks.find((t) => t.id === workflow.taskId);
 
     if (task) {
-      setSelectedWorkflowForDialog({ workflow, task });
+      setSelectedWorkflowForDialog({ workflow, task, mode: 'view' });
       setWorkflowDialogOpen(true);
     } else {
       toast({
@@ -282,7 +287,7 @@ export default function Dashboard() {
     // Find the task associated with this workflow
     const task = tasks.find((t) => t.id === workflow.taskId);
     if (task) {
-      setSelectedWorkflowForDialog({ workflow, task });
+      setSelectedWorkflowForDialog({ workflow, task, mode: 'edit' });
       setWorkflowDialogOpen(true);
     } else {
       toast({
@@ -299,49 +304,89 @@ export default function Dashboard() {
     setWorkflowDialogOpen(true);
   };
 
+  // Timeout utility
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Operation timed out')), ms)
+      )
+    ]);
+  };
+
   // Initialize database and fetch data
   useEffect(() => {
     async function initializeAndLoadData() {
+      // Prevent redundant initialization attempts
+      if (initializationAttempted.current && !dataRefreshTrigger) {
+        return;
+      }
+      
       setLoading(true);
       try {
-        // First try to ensure tables exist
-        const tablesExist = await ensureTablesExist();
+        // First try to ensure tables exist with timeout
+        const tablesExist = await withTimeout(ensureTablesExist(), 30000);
         setDbInitialized(tablesExist);
+        initializationAttempted.current = true;
 
-        // Initialize admin users from hardcoded list
-        await initializeAdminUsers();
+        // Initialize admin users from hardcoded list (only once)
+        if (!adminInitialized.current) {
+          try {
+            await withTimeout(initializeAdminUsers(), 15000);
+            adminInitialized.current = true;
+          } catch (error) {
+            console.warn("Admin initialization failed, continuing without:", error);
+            // Don't block the app for admin initialization failures
+          }
+        }
 
         if (tablesExist) {
-          // If tables exist, fetch data
-          const [
-            groupsData,
-            categoriesData,
-            peopleData,
-            allocationsData,
-            tasksData,
-            taskAllocationsData,
-          ] = await Promise.all([
-            fetchGroups(),
-            fetchCategories(),
-            fetchPeople(),
-            fetchAllocations(),
-            fetchTasks(),
-            fetchTaskAllocations(),
-          ]);
+          // If tables exist, fetch data with timeout and parallel execution
+          try {
+            const [
+              groupsData,
+              categoriesData,
+              peopleData,
+              allocationsData,
+              tasksData,
+              taskAllocationsData,
+            ] = await withTimeout(
+              Promise.all([
+                fetchGroups(),
+                fetchCategories(),
+                fetchPeople(),
+                fetchAllocations(),
+                fetchTasks(),
+                fetchTaskAllocations(),
+              ]),
+              20000
+            );
 
-          setGroups(groupsData);
-          setCategories(categoriesData);
-          setPeople(peopleData);
-          setAllocations(allocationsData);
-          setTasks(tasksData);
-          setTaskAllocations(taskAllocationsData);
+            setGroups(groupsData);
+            setCategories(categoriesData);
+            setPeople(peopleData);
+            setAllocations(allocationsData);
+            setTasks(tasksData);
+            setTaskAllocations(taskAllocationsData);
+          } catch (dataError) {
+            console.error("Error fetching data:", dataError);
+            toast({
+              title: "Warning",
+              description: "Some data could not be loaded. You can try refreshing the page.",
+              variant: "destructive",
+            });
+          }
         }
       } catch (error) {
         console.error("Error initializing and loading data:", error);
+        
+        // Show different error messages based on the error type
+        const isTimeout = error instanceof Error && error.message.includes('timed out');
         toast({
           title: "Error",
-          description:
-            "Failed to initialize database or load data. Please try again.",
+          description: isTimeout 
+            ? "The application is taking longer than expected to load. Please check your internet connection and try refreshing."
+            : "Failed to initialize database or load data. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -361,17 +406,26 @@ export default function Dashboard() {
   const initializeDatabase = async () => {
     setInitializingDb(true);
     try {
-      const success = await ensureTablesExist();
+      const success = await withTimeout(ensureTablesExist(), 45000);
       setDbInitialized(success);
-      toast({
-        title: "Success",
-        description: "Database initialized successfully.",
-      });
+      initializationAttempted.current = true;
+      
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Database initialized successfully.",
+        });
+        // Trigger data refresh
+        refreshData();
+      }
     } catch (error) {
       console.error("Error initializing database:", error);
+      const isTimeout = error instanceof Error && error.message.includes('timed out');
       toast({
         title: "Error",
-        description: "Failed to initialize database. Please try again.",
+        description: isTimeout
+          ? "Database initialization timed out. Please check your connection and try again."
+          : "Failed to initialize database. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -726,10 +780,10 @@ export default function Dashboard() {
           <div className="flex justify-between items-center px-4 py-3">
             <div className="flex items-center space-x-4">
               <h1 className="text-xl font-bold text-gray-900 hidden sm:block">
-                Land iQ - Project Management
+                Land iQ - Project Management [[memory:1160015]]
               </h1>
               <h1 className="text-lg font-bold text-gray-900 sm:hidden">
-                Land iQ - Project Management
+                Land iQ - Project Management [[memory:1160015]]
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -740,95 +794,28 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar Navigation */}
-          <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex-shrink-0 hidden sm:flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <div className="w-20 h-4 bg-gray-200 rounded animate-pulse mb-4"></div>
-              <div className="space-y-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex items-center px-3 py-2">
-                    <div className="w-4 h-4 bg-gray-200 rounded animate-pulse mr-3"></div>
-                    <div className="w-16 h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                ))}
-              </div>
+        {/* Main Content with Loading Progress */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-lg">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg animate-pulse mb-6 mx-auto flex items-center justify-center">
+              <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
             </div>
-          </div>
-
-          {/* Mobile tabs */}
-          <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
-            <div className="flex justify-around">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex flex-col items-center py-2 px-3">
-                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse mb-1"></div>
-                  <div className="w-8 h-3 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              ))}
+            <h2 className="text-xl font-bold mb-2">Loading Application</h2>
+            <p className="text-gray-600 mb-4">
+              Initializing database and loading your data...
+            </p>
+            
+            {/* Progress indicator */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '70%' }}></div>
             </div>
-          </div>
-
-          {/* Main content area */}
-          <div className="flex-1 overflow-hidden bg-white w-full">
-            <div className="p-6 space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="p-4 border border-gray-200 rounded-lg"
-                  >
-                    <div className="space-y-2">
-                      <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="w-12 h-8 bg-gray-200 rounded animate-pulse"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Main Chart Area */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="p-6 border border-gray-200 rounded-lg">
-                  <div className="mb-6">
-                    <div className="w-32 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
-                    <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                  <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
-                </div>
-                <div className="p-6 border border-gray-200 rounded-lg">
-                  <div className="mb-6">
-                    <div className="w-28 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
-                    <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                  <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-4 border-b border-gray-200">
-                  <div className="w-32 h-6 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-                <div className="space-y-1">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex gap-4 p-4 border-b border-gray-100"
-                    >
-                      {Array.from({ length: 5 }).map((_, j) => (
-                        <div
-                          key={j}
-                          className={`h-4 bg-gray-200 rounded animate-pulse ${
-                            j === 0 ? "w-1/4" : "flex-1"
-                          }`}
-                        ></div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            
+            <p className="text-sm text-gray-500">
+              This should only take a few seconds. If this continues, please check your internet connection.
+            </p>
           </div>
         </div>
       </div>
@@ -1363,11 +1350,17 @@ export default function Dashboard() {
 
           <WorkflowDialog
             open={workflowDialogOpen}
-            onOpenChange={setWorkflowDialogOpen}
+            onOpenChange={(open) => {
+              setWorkflowDialogOpen(open);
+              if (!open) {
+                setSelectedWorkflowForDialog(null);
+              }
+            }}
             task={selectedWorkflowForDialog?.task}
             people={people}
             workflow={selectedWorkflowForDialog?.workflow}
             isCreateMode={!selectedWorkflowForDialog}
+            mode={selectedWorkflowForDialog?.mode}
           />
         </>
       )}

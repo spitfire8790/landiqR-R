@@ -827,6 +827,153 @@ const NotesNode = ({ data, selected }: { data: any; selected: boolean }) => {
   );
 };
 
+// Rectangle stage node component for workflow stages
+const RectangleStageNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const colors = getNoteColorStyles(data.color || "blue");
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className={`px-6 py-4 shadow-lg rounded-lg ${colors.bg} border-2 ${
+          selected ? colors.selectedBorder : colors.border
+        } min-w-[180px] max-w-[300px] cursor-pointer relative`}
+        style={{
+          animation: selected
+            ? "glow-selected 2s ease-in-out infinite alternate"
+            : "glow 3s ease-in-out infinite alternate",
+          boxShadow: selected
+            ? `0 0 15px ${colors.glow}, 0 0 25px ${colors.glow}, 0 0 35px ${colors.glow}`
+            : `0 0 10px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 25px ${colors.glow}`,
+        }}
+      >
+        {/* Connection handles */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="bottom"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+        />
+
+        <div className="text-center">
+          <div className="font-bold text-lg text-black">
+            {data.text || "Stage"}
+          </div>
+          {data.subtitle && (
+            <div className="text-sm text-gray-700 mt-1">
+              {data.subtitle}
+            </div>
+          )}
+        </div>
+
+        {!data.text && (
+          <div className="text-sm text-gray-600 italic text-center">
+            Click to add stage text...
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+// Chevron stage node component for workflow stages
+const ChevronStageNode = ({ data, selected }: { data: any; selected: boolean }) => {
+  const colors = getNoteColorStyles(data.color || "green");
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: glowStyles }} />
+      <div
+        className="relative cursor-pointer"
+        style={{ width: "200px", height: "80px" }}
+      >
+        {/* Chevron shape using CSS */}
+        <div
+          className={`absolute inset-0 ${colors.bg} border-2 ${
+            selected ? colors.selectedBorder : colors.border
+          } shadow-lg`}
+          style={{
+            clipPath: "polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%, 15% 50%)",
+            animation: selected
+              ? "glow-selected 2s ease-in-out infinite alternate"
+              : "glow 3s ease-in-out infinite alternate",
+            boxShadow: selected
+              ? `0 0 15px ${colors.glow}, 0 0 25px ${colors.glow}, 0 0 35px ${colors.glow}`
+              : `0 0 10px ${colors.glow}, 0 0 20px ${colors.glow}, 0 0 25px ${colors.glow}`,
+          }}
+        />
+
+        {/* Content container */}
+        <div className="absolute inset-0 flex items-center justify-center px-4">
+          <div className="text-center max-w-full">
+            <div className="font-bold text-lg text-black">
+              {data.text || "Stage"}
+            </div>
+            {data.subtitle && (
+              <div className="text-sm text-gray-700 mt-1">
+                {data.subtitle}
+              </div>
+            )}
+            {!data.text && (
+              <div className="text-sm text-gray-600 italic">
+                Click to add stage text...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Connection handles */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="top"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+          style={{ top: -6, left: "50%" }}
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="bottom"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+          style={{ bottom: -6, left: "50%" }}
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+          style={{ left: -6, top: "50%" }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className={`w-3 h-3 ${colors.handle} border-2 border-white`}
+          style={{ right: -6, top: "50%" }}
+        />
+      </div>
+    </>
+  );
+};
+
 interface WorkflowBuilderProps {
   people: Person[];
   tools: WorkflowTool[];
@@ -863,6 +1010,9 @@ export function WorkflowBuilder({
   const [newNotesTitle, setNewNotesTitle] = useState("");
   const [newNotesContent, setNewNotesContent] = useState("");
   const [newNotesColor, setNewNotesColor] = useState("gray");
+  const [newStageText, setNewStageText] = useState("");
+  const [newStageSubtitle, setNewStageSubtitle] = useState("");
+  const [newStageColor, setNewStageColor] = useState("blue");
   const [loading, setLoading] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -1121,6 +1271,8 @@ export function WorkflowBuilder({
       start: StartNode,
       end: EndNode,
       parallel: ParallelNode,
+      rectangle: RectangleStageNode,
+      chevron: ChevronStageNode,
     }),
     []
   );
@@ -1167,7 +1319,7 @@ export function WorkflowBuilder({
     if (!isUndoRedoAction) {
       saveToHistory(nodes, edges);
     }
-  }, [nodes, edges, saveToHistory, isUndoRedoAction]);
+  }, [nodes, edges, isUndoRedoAction]);
 
   // Handle keyboard events for deletion and undo/redo
   useEffect(() => {
@@ -1264,42 +1416,57 @@ export function WorkflowBuilder({
 
   // Handle new connections
   const onConnect = useCallback(
-  (params: Connection) => {
-    // Defensive: Ensure sourceHandle and targetHandle are always set
-    let { sourceHandle, targetHandle, source, target } = params;
-    if (!sourceHandle) {
-      // Try to guess the most likely handle id based on node type
-      // (You may want to improve this logic if you add more node types)
-      if (source && source.startsWith('start')) sourceHandle = 'bottom';
-      else if (source && source.startsWith('step')) sourceHandle = 'bottom';
-      else if (source && source.startsWith('parallel')) sourceHandle = 'bottom';
-      else if (source && source.startsWith('decision')) sourceHandle = 'yes'; // default to 'yes' for decision
-      else sourceHandle = 'bottom';
-      console.warn('Missing sourceHandle on connect, defaulting to', sourceHandle, params);
-    }
-    if (!targetHandle) {
-      if (target && target.startsWith('end')) targetHandle = 'top';
-      else if (target && target.startsWith('step')) targetHandle = 'top';
-      else if (target && target.startsWith('parallel')) targetHandle = 'top';
-      else if (target && target.startsWith('decision')) targetHandle = 'top';
-      else targetHandle = 'top';
-      console.warn('Missing targetHandle on connect, defaulting to', targetHandle, params);
-    }
-    setEdges((eds) =>
-      addEdge(
-        {
-          ...params,
-          id: `edge-${Date.now()}`,
+    (params: Connection) => {
+      // Defensive: Ensure sourceHandle and targetHandle are always set
+      let { sourceHandle, targetHandle, source, target } = params;
+      if (!sourceHandle) {
+        // Try to guess the most likely handle id based on node type
+        // (You may want to improve this logic if you add more node types)
+        if (source && source.startsWith("start")) sourceHandle = "bottom";
+        else if (source && source.startsWith("step")) sourceHandle = "bottom";
+        else if (source && source.startsWith("parallel"))
+          sourceHandle = "bottom";
+        else if (source && source.startsWith("decision"))
+          sourceHandle = "yes"; // default to 'yes' for decision
+        else if (source && source.startsWith("rectangle"))
+          sourceHandle = "bottom";
+        else if (source && source.startsWith("chevron"))
+          sourceHandle = "bottom";
+        else sourceHandle = "bottom";
+        console.warn(
+          "Missing sourceHandle on connect, defaulting to",
           sourceHandle,
+          params
+        );
+      }
+      if (!targetHandle) {
+        if (target && target.startsWith("end")) targetHandle = "top";
+        else if (target && target.startsWith("step")) targetHandle = "top";
+        else if (target && target.startsWith("parallel")) targetHandle = "top";
+        else if (target && target.startsWith("decision")) targetHandle = "top";
+        else if (target && target.startsWith("rectangle")) targetHandle = "top";
+        else if (target && target.startsWith("chevron")) targetHandle = "top";
+        else targetHandle = "top";
+        console.warn(
+          "Missing targetHandle on connect, defaulting to",
           targetHandle,
-        },
-        eds
-      )
-    );
-  },
-  [setEdges]
-);
-
+          params
+        );
+      }
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
+            id: `edge-${Date.now()}`,
+            sourceHandle,
+            targetHandle,
+          },
+          eds
+        )
+      );
+    },
+    [setEdges]
+  );
 
   // Load existing workflow data
   useEffect(() => {
@@ -1508,6 +1675,42 @@ export function WorkflowBuilder({
     setNodes((nds) => nds.concat(newNode));
   };
 
+  // Add new rectangle stage node
+  const addRectangleStageNode = () => {
+    const newNode: Node = {
+      id: `rectangle-${Date.now()}`,
+      type: "rectangle",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        text: newStageText.trim(),
+        subtitle: newStageSubtitle.trim(),
+        color: newStageColor,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+    setNewStageText("");
+    setNewStageSubtitle("");
+    setNewStageColor("blue");
+  };
+
+  // Add new chevron stage node
+  const addChevronStageNode = () => {
+    const newNode: Node = {
+      id: `chevron-${Date.now()}`,
+      type: "chevron",
+      position: { x: Math.random() * 400, y: Math.random() * 400 },
+      data: {
+        text: newStageText.trim(),
+        subtitle: newStageSubtitle.trim(),
+        color: newStageColor,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+    setNewStageText("");
+    setNewStageSubtitle("");
+    setNewStageColor("green");
+  };
+
   // Save node edits
   const handleStepSave = (data: any) => {
     setNodes((nds) =>
@@ -1625,11 +1828,11 @@ export function WorkflowBuilder({
   // Filter edges connected to notes nodes when showNotes is false
   const filteredEdges = animatedEdges.filter((edge) => {
     if (showNotes) return true;
-    
+
     // Check if either source or target node is a notes node
-    const sourceNode = nodes.find(node => node.id === edge.source);
-    const targetNode = nodes.find(node => node.id === edge.target);
-    
+    const sourceNode = nodes.find((node) => node.id === edge.source);
+    const targetNode = nodes.find((node) => node.id === edge.target);
+
     return sourceNode?.type !== "notes" && targetNode?.type !== "notes";
   });
 
@@ -1781,7 +1984,7 @@ export function WorkflowBuilder({
               <div>
                 <Label>People</Label>
                 <Select
-                  value={""}
+                  value={undefined}
                   onValueChange={(val) =>
                     setNewStepPeople([...newStepPeople, val])
                   }
@@ -1875,7 +2078,7 @@ export function WorkflowBuilder({
               <div>
                 <Label>Tools</Label>
                 <Select
-                  value={""}
+                  value={undefined}
                   onValueChange={(val) =>
                     setNewStepTools([...newStepTools, val])
                   }
@@ -2016,6 +2219,112 @@ export function WorkflowBuilder({
           <Separator />
 
           <div>
+            <h3 className="text-lg font-semibold mb-2">Add Stage Shapes</h3>
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="stage-text">Stage Text</Label>
+                <Input
+                  id="stage-text"
+                  value={newStageText}
+                  onChange={(e) => setNewStageText(e.target.value)}
+                  placeholder="e.g. Planning Phase, Review Stage"
+                />
+              </div>
+              <div>
+                <Label htmlFor="stage-subtitle">Subtitle (optional)</Label>
+                <Input
+                  id="stage-subtitle"
+                  value={newStageSubtitle}
+                  onChange={(e) => setNewStageSubtitle(e.target.value)}
+                  placeholder="Additional description"
+                />
+              </div>
+              <div>
+                <Label>Color</Label>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  {[
+                    {
+                      value: "gray",
+                      bg: "bg-gray-100",
+                      border: "border-gray-300",
+                    },
+                    {
+                      value: "yellow",
+                      bg: "bg-yellow-100",
+                      border: "border-yellow-300",
+                    },
+                    {
+                      value: "blue",
+                      bg: "bg-blue-100",
+                      border: "border-blue-300",
+                    },
+                    {
+                      value: "green",
+                      bg: "bg-green-100",
+                      border: "border-green-300",
+                    },
+                    {
+                      value: "red",
+                      bg: "bg-red-100",
+                      border: "border-red-300",
+                    },
+                    {
+                      value: "purple",
+                      bg: "bg-purple-100",
+                      border: "border-purple-300",
+                    },
+                    {
+                      value: "pink",
+                      bg: "bg-pink-100",
+                      border: "border-pink-300",
+                    },
+                    {
+                      value: "orange",
+                      bg: "bg-orange-100",
+                      border: "border-orange-300",
+                    },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setNewStageColor(color.value)}
+                      className={`w-8 h-8 rounded-md border-2 ${color.bg} ${
+                        newStageColor === color.value
+                          ? "border-black"
+                          : color.border
+                      } hover:border-black transition-colors`}
+                      title={
+                        color.value.charAt(0).toUpperCase() +
+                        color.value.slice(1)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={addRectangleStageNode}
+                  variant="outline"
+                  className="flex-1 flex items-center justify-center gap-2"
+                >
+                  <Square className="h-4 w-4" />
+                  <span>Rectangle</span>
+                </Button>
+                <Button
+                  onClick={addChevronStageNode}
+                  variant="outline"
+                  className="flex-1 flex items-center justify-center gap-2"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                  <span>Chevron</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
             <h3 className="text-lg font-semibold mb-2">Add Decision Node</h3>
             <Button
               onClick={addDecisionNode}
@@ -2025,6 +2334,38 @@ export function WorkflowBuilder({
               <Diamond className="h-4 w-4 text-blue-600" />
               <span>Add Decision</span>
             </Button>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Add Flow Nodes</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={addStartNode}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+              >
+                <Play className="h-4 w-4 text-green-600" />
+                <span>Start</span>
+              </Button>
+              <Button
+                onClick={addEndNode}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+              >
+                <Square className="h-4 w-4 text-red-600" />
+                <span>End</span>
+              </Button>
+              <Button
+                onClick={addParallelNode}
+                variant="outline"
+                className="col-span-2 flex items-center justify-center gap-2"
+              >
+                <GitBranch className="h-4 w-4 text-purple-600" />
+                <span>Parallel Process</span>
+              </Button>
+            </div>
           </div>
 
           <Separator />
@@ -2263,6 +2604,11 @@ function NodeEditDialog({
   const [notesContent, setNotesContent] = useState(nodeData?.content || "");
   const [notesColor, setNotesColor] = useState(nodeData?.color || "gray");
 
+  // Stage node fields
+  const [stageText, setStageText] = useState(nodeData?.text || "");
+  const [stageSubtitle, setStageSubtitle] = useState(nodeData?.subtitle || "");
+  const [stageColor, setStageColor] = useState(nodeData?.color || "blue");
+
   useEffect(() => {
     if (nodeType === "step") {
       setAction(nodeData?.action || "");
@@ -2274,6 +2620,10 @@ function NodeEditDialog({
       setNotesTitle(nodeData?.title || "");
       setNotesContent(nodeData?.content || "");
       setNotesColor(nodeData?.color || "gray");
+    } else if (nodeType === "rectangle" || nodeType === "chevron") {
+      setStageText(nodeData?.text || "");
+      setStageSubtitle(nodeData?.subtitle || "");
+      setStageColor(nodeData?.color || "blue");
     }
   }, [nodeData, nodeType, open]);
 
@@ -2305,7 +2655,13 @@ function NodeEditDialog({
     >
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
         <h3 id="edit-step-dialog-title" className="text-lg font-semibold mb-2">
-          {nodeType === "notes" ? "Edit Notes" : "Edit Step"}
+          {nodeType === "notes" 
+            ? "Edit Notes" 
+            : nodeType === "rectangle" 
+            ? "Edit Rectangle Stage" 
+            : nodeType === "chevron"
+            ? "Edit Chevron Stage"
+            : "Edit Step"}
         </h3>
         <div className="space-y-3">
           {nodeType === "notes" ? (
@@ -2391,6 +2747,88 @@ function NodeEditDialog({
                 </div>
               </div>
             </>
+          ) : nodeType === "rectangle" || nodeType === "chevron" ? (
+            // Stage node fields
+            <>
+              <div>
+                <Label>Stage Text</Label>
+                <Input
+                  value={stageText}
+                  onChange={(e) => setStageText(e.target.value)}
+                  placeholder="e.g. Planning Phase, Review Stage"
+                />
+              </div>
+              <div>
+                <Label>Subtitle (optional)</Label>
+                <Input
+                  value={stageSubtitle}
+                  onChange={(e) => setStageSubtitle(e.target.value)}
+                  placeholder="Additional description"
+                />
+              </div>
+              <div>
+                <Label>Color</Label>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  {[
+                    {
+                      value: "gray",
+                      bg: "bg-gray-100",
+                      border: "border-gray-300",
+                    },
+                    {
+                      value: "yellow",
+                      bg: "bg-yellow-100",
+                      border: "border-yellow-300",
+                    },
+                    {
+                      value: "blue",
+                      bg: "bg-blue-100",
+                      border: "border-blue-300",
+                    },
+                    {
+                      value: "green",
+                      bg: "bg-green-100",
+                      border: "border-green-300",
+                    },
+                    {
+                      value: "red",
+                      bg: "bg-red-100",
+                      border: "border-red-300",
+                    },
+                    {
+                      value: "purple",
+                      bg: "bg-purple-100",
+                      border: "border-purple-300",
+                    },
+                    {
+                      value: "pink",
+                      bg: "bg-pink-100",
+                      border: "border-pink-300",
+                    },
+                    {
+                      value: "orange",
+                      bg: "bg-orange-100",
+                      border: "border-orange-300",
+                    },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setStageColor(color.value)}
+                      className={`w-8 h-8 rounded-md border-2 ${color.bg} ${
+                        stageColor === color.value
+                          ? "border-black"
+                          : color.border
+                      } hover:border-black transition-colors`}
+                      title={
+                        color.value.charAt(0).toUpperCase() +
+                        color.value.slice(1)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
           ) : (
             // Step node fields
             <>
@@ -2414,7 +2852,7 @@ function NodeEditDialog({
               <div>
                 <Label>People</Label>
                 <Select
-                  value={""}
+                  value={undefined}
                   onValueChange={(val) =>
                     setSelectedPeople([...selectedPeople, val])
                   }
@@ -2508,7 +2946,7 @@ function NodeEditDialog({
               <div>
                 <Label>Tools</Label>
                 <Select
-                  value={""}
+                  value={undefined}
                   onValueChange={(val) =>
                     setSelectedTools([...selectedTools, val])
                   }
@@ -2598,6 +3036,12 @@ function NodeEditDialog({
                   title: notesTitle,
                   content: notesContent,
                   color: notesColor,
+                });
+              } else if (nodeType === "rectangle" || nodeType === "chevron") {
+                onSave({
+                  text: stageText,
+                  subtitle: stageSubtitle,
+                  color: stageColor,
                 });
               } else {
                 onSave({

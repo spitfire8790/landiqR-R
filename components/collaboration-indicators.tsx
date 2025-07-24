@@ -105,7 +105,9 @@ export default function CollaborationIndicators({
     }
   };
 
-  const getActivityIcon = (type: OnlineUser["currentActivity"]["type"]) => {
+  const getActivityIcon = (
+    type: NonNullable<OnlineUser["currentActivity"]>["type"]
+  ) => {
     switch (type) {
       case "viewing":
         return <Eye className="h-3 w-3" />;
@@ -118,7 +120,9 @@ export default function CollaborationIndicators({
     }
   };
 
-  const getActivityColor = (type: OnlineUser["currentActivity"]["type"]) => {
+  const getActivityColor = (
+    type: NonNullable<OnlineUser["currentActivity"]>["type"]
+  ) => {
     switch (type) {
       case "viewing":
         return "text-blue-600 bg-blue-100";

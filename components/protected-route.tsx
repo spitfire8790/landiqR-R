@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -18,6 +18,19 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isAuthenticated, isLoading, router]);
 
+  // Set a maximum loading time to prevent infinite hanging (disabled)
+  // useEffect(() => {
+  //   if (isLoading) {
+  //     const timer = setTimeout(() => {
+  //       setMaxLoadingTime(true);
+  //     }, 30000); // 30 seconds max loading time
+
+  //     return () => clearTimeout(timer);
+  //   } else {
+  //     setMaxLoadingTime(false);
+  //   }
+  // }, [isLoading]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -29,6 +42,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       </div>
     );
   }
+
+  // Timeout warning removed per user request
 
   if (!isAuthenticated) {
     return null;
