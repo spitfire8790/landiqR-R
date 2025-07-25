@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Download,
   Activity,
+  Building2,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
@@ -38,6 +39,7 @@ import DraggableChatModal from "@/components/draggable-chat-modal";
 import HowToUseButton from "@/components/how-to-use-button";
 import HowToUseModal from "@/components/how-to-use-modal";
 import NotificationBell from "@/components/notification-bell";
+import PipedriveTab from "@/components/pipedrive/PipedriveTab";
 import { useAuth } from "@/contexts/auth-context";
 import dynamic from "next/dynamic";
 import type {
@@ -147,7 +149,7 @@ export default function Dashboard() {
   const [initializingDb, setInitializingDb] = useState(false);
   // Trigger for data refresh
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
-  
+
   // Add refs to prevent redundant operations
   const initializationAttempted = useRef(false);
   const adminInitialized = useRef(false);
@@ -216,7 +218,7 @@ export default function Dashboard() {
   const [selectedWorkflowForDialog, setSelectedWorkflowForDialog] = useState<{
     workflow: any;
     task: Task;
-    mode: 'view' | 'edit';
+    mode: "view" | "edit";
   } | null>(null);
 
   const { toast } = useToast();
@@ -272,7 +274,7 @@ export default function Dashboard() {
     const task = tasks.find((t) => t.id === workflow.taskId);
 
     if (task) {
-      setSelectedWorkflowForDialog({ workflow, task, mode: 'view' });
+      setSelectedWorkflowForDialog({ workflow, task, mode: "view" });
       setWorkflowDialogOpen(true);
     } else {
       toast({
@@ -287,7 +289,7 @@ export default function Dashboard() {
     // Find the task associated with this workflow
     const task = tasks.find((t) => t.id === workflow.taskId);
     if (task) {
-      setSelectedWorkflowForDialog({ workflow, task, mode: 'edit' });
+      setSelectedWorkflowForDialog({ workflow, task, mode: "edit" });
       setWorkflowDialogOpen(true);
     } else {
       toast({
@@ -309,8 +311,8 @@ export default function Dashboard() {
     return Promise.race([
       promise,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Operation timed out')), ms)
-      )
+        setTimeout(() => reject(new Error("Operation timed out")), ms)
+      ),
     ]);
   };
 
@@ -321,7 +323,7 @@ export default function Dashboard() {
       if (initializationAttempted.current && !dataRefreshTrigger) {
         return;
       }
-      
+
       setLoading(true);
       try {
         // First try to ensure tables exist with timeout
@@ -335,7 +337,10 @@ export default function Dashboard() {
             await withTimeout(initializeAdminUsers(), 15000);
             adminInitialized.current = true;
           } catch (error) {
-            console.warn("Admin initialization failed, continuing without:", error);
+            console.warn(
+              "Admin initialization failed, continuing without:",
+              error
+            );
             // Don't block the app for admin initialization failures
           }
         }
@@ -372,19 +377,21 @@ export default function Dashboard() {
             console.error("Error fetching data:", dataError);
             toast({
               title: "Warning",
-              description: "Some data could not be loaded. You can try refreshing the page.",
+              description:
+                "Some data could not be loaded. You can try refreshing the page.",
               variant: "destructive",
             });
           }
         }
       } catch (error) {
         console.error("Error initializing and loading data:", error);
-        
+
         // Show different error messages based on the error type
-        const isTimeout = error instanceof Error && error.message.includes('timed out');
+        const isTimeout =
+          error instanceof Error && error.message.includes("timed out");
         toast({
           title: "Error",
-          description: isTimeout 
+          description: isTimeout
             ? "The application is taking longer than expected to load. Please check your internet connection and try refreshing."
             : "Failed to initialize database or load data. Please try again.",
           variant: "destructive",
@@ -409,7 +416,7 @@ export default function Dashboard() {
       const success = await withTimeout(ensureTablesExist(), 45000);
       setDbInitialized(success);
       initializationAttempted.current = true;
-      
+
       if (success) {
         toast({
           title: "Success",
@@ -420,7 +427,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Error initializing database:", error);
-      const isTimeout = error instanceof Error && error.message.includes('timed out');
+      const isTimeout =
+        error instanceof Error && error.message.includes("timed out");
       toast({
         title: "Error",
         description: isTimeout
@@ -780,10 +788,10 @@ export default function Dashboard() {
           <div className="flex justify-between items-center px-4 py-3">
             <div className="flex items-center space-x-4">
               <h1 className="text-xl font-bold text-gray-900 hidden sm:block">
-                Land iQ - Project Management [[memory:1160015]]
+                Land iQ - Project Management
               </h1>
               <h1 className="text-lg font-bold text-gray-900 sm:hidden">
-                Land iQ - Project Management [[memory:1160015]]
+                Land iQ - Project Management
               </h1>
             </div>
             <div className="flex items-center space-x-2">
@@ -798,23 +806,42 @@ export default function Dashboard() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-lg">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg animate-pulse mb-6 mx-auto flex items-center justify-center">
-              <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg
+                className="w-8 h-8 text-white animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
             </div>
             <h2 className="text-xl font-bold mb-2">Loading Application</h2>
             <p className="text-gray-600 mb-4">
-              Initializing database and loading your data...
+              Initialising database and loading your data...
             </p>
-            
+
             {/* Progress indicator */}
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '70%' }}></div>
+              <div
+                className="bg-blue-500 h-2 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
             </div>
-            
+
             <p className="text-sm text-gray-500">
-              This should only take a few seconds. If this continues, please check your internet connection.
+              This should only take a few seconds. If this continues, please
+              check your internet connection.
             </p>
           </div>
         </div>
@@ -840,7 +867,7 @@ export default function Dashboard() {
             {initializingDb ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                Initializing...
+                Initialising...
               </>
             ) : (
               <>
@@ -1048,6 +1075,18 @@ export default function Dashboard() {
                 Analytics
               </button>
               <button
+                onClick={() => setActiveTab("pipedrive")}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  activeTab === "pipedrive"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Building2 className="mr-3 h-4 w-4" />
+                Pipedrive
+              </button>
+              <button
                 onClick={() => setActiveTab("activity")}
                 className={cn(
                   "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
@@ -1133,7 +1172,7 @@ export default function Dashboard() {
               { key: "people", icon: Users, label: "People" },
               { key: "tasks", icon: CheckSquare, label: "Tasks" },
               { key: "analytics", icon: BarChart, label: "Analytics" },
-              { key: "activity", icon: Activity, label: "Activity" },
+              { key: "pipedrive", icon: Building2, label: "Pipedrive" },
             ].map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1237,6 +1276,12 @@ export default function Dashboard() {
           {activeTab === "analytics" && (
             <div className="h-full w-full">
               <ResponsibilityChart people={people} allocations={allocations} />
+            </div>
+          )}
+
+          {activeTab === "pipedrive" && (
+            <div className="h-full w-full">
+              <PipedriveTab />
             </div>
           )}
 

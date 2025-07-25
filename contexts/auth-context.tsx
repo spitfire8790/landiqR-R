@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { getUserRole, ensureUserRolesTable } from "@/lib/user-management";
 
@@ -26,8 +32,8 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Operation timed out')), ms)
-    )
+      setTimeout(() => reject(new Error("Operation timed out")), ms)
+    ),
   ]);
 };
 
@@ -37,9 +43,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Cache to prevent redundant role checks
-  const roleCache = useRef<Map<string, { role: UserRole; timestamp: number }>>(new Map());
+  const roleCache = useRef<Map<string, { role: UserRole; timestamp: number }>>(
+    new Map()
+  );
   const initializationRef = useRef<boolean>(false);
 
   // Helper: extract role from the database based on email with caching and timeout
@@ -47,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user?.email) return null;
 
     const email = session.user.email;
-    
+
     // Check cache first (cache for 5 minutes)
     const cached = roleCache.current.get(email);
     if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
@@ -55,22 +63,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Add timeout to prevent hanging
-      const role = await withTimeout(getUserRole(email), 10000);
-      
+      // Increase timeout to 30 seconds for better reliability
+      const role = await withTimeout(getUserRole(email), 30000);
+
       // Cache the result
       roleCache.current.set(email, { role, timestamp: Date.now() });
-      
+
       return role;
     } catch (error) {
-      console.error("Error getting user role:", error);
-      
-      // If we have a cached version, use it even if expired
-      if (cached) {
-        console.warn("Using expired cached role due to error");
-        return cached.role;
+      console.warn("Failed to derive role from session:", error);
+
+      // If it's a timeout error, try to return a cached value (even if expired)
+      if (error instanceof Error && error.message.includes("timeout")) {
+        const expiredCached = roleCache.current.get(email);
+        if (expiredCached) {
+          console.log("Using expired cached role due to timeout");
+          return expiredCached.role;
+        }
       }
-      
+
+      // Default to null role instead of throwing
       return null;
     }
   };
@@ -83,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const init = async () => {
       try {
-        const { data } = await withTimeout(supabase.auth.getSession(), 15000);
+        const { data } = await withTimeout(supabase.auth.getSession(), 30000);
         const currentSession = data.session;
         setIsAuthenticated(!!currentSession);
 
@@ -141,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const { error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email, password }), 
+        supabase.auth.signInWithPassword({ email, password }),
         15000
       );
       if (error) {
@@ -158,11 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign-up helper (stores selected role in user_metadata)
   const signup = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Ensure user roles table exists with timeout
-      await withTimeout(ensureUserRolesTable(), 10000);
+      // Ensure user roles table exists with increased timeout
+      await withTimeout(ensureUserRolesTable(), 30000);
 
-      // Check if user has a role in the database with timeout
-      const userRole = await withTimeout(getUserRole(email), 10000);
+      // Check if user has a role in the database with increased timeout
+      const userRole = await withTimeout(getUserRole(email), 30000);
       if (!userRole) {
         console.warn("Signup attempt blocked: user not authorized");
         return false;
@@ -178,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
         15000
       );
-      
+
       if (error) {
         console.error("Signup error:", error);
         return false;

@@ -49,7 +49,7 @@ export async function ensureUserRolesTable(): Promise<boolean> {
     // First, check if the table exists by trying to query it with timeout
     const result = await withTimeout(
       supabase.from('user_roles').select('id').limit(1) as any,
-      5000
+      15000 // Increased from 5000 to 15000ms
     );
     const { data, error: checkError } = result as any;
 
@@ -243,7 +243,7 @@ export async function getUserRole(email: string): Promise<UserRole | null> {
           .select('role')
           .eq('email', email.toLowerCase().trim())
           .single() as any,
-        8000
+        15000 // Increased from 8000 to 15000ms
       );
       const { data, error } = result as any;
 
@@ -256,9 +256,9 @@ export async function getUserRole(email: string): Promise<UserRole | null> {
       }
 
       return data.role as UserRole;
-    }, 2, 2000);
+    }, 3, 3000); // Increased retry delay from 2000 to 3000ms
   } catch (error) {
-    console.error('Error getting user role after retries:', error);
+    console.error("Error getting user role:", error);
     return null;
   }
 }
