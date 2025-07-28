@@ -113,6 +113,9 @@ export default function PipedriveTab() {
     useState<string>("All Events");
   const [availableEventTypes, setAvailableEventTypes] = useState<string[]>([]);
 
+  // Track the most recent event date found in the Land iQ CSV
+  const [latestEventDate, setLatestEventDate] = useState<Date | null>(null);
+
   // Collapsible chart state (expanded by default)
   const [chartCollapsed, setChartCollapsed] = useState(false);
   // (Scatter chart removed – state no longer needed)
@@ -126,6 +129,10 @@ export default function PipedriveTab() {
     Record<string, string>
   >({});
   const customerTypeMapRef = useRef<Record<string, string>>({}); // immediate-access ref
+
+  // Diagnostic state
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
 
   const { toast } = useToast();
 
@@ -573,9 +580,9 @@ export default function PipedriveTab() {
       setIsInitialLoad(true);
       setLoadingProgress(0);
       setLoadingMessage("Checking Pipedrive connection...");
-      
+
       const isConnected = await testPipedriveConnection();
-      
+
       if (isConnected) {
         setLoadingProgress(20);
         setLoadingMessage("Extracting customer type mappings...");
@@ -583,7 +590,7 @@ export default function PipedriveTab() {
         await extractCustomerTypeMappings();
         setLoadingProgress(40);
       }
-      
+
       setLoadingMessage("Loading dashboard data...");
       await loadDashboardData(isConnected);
       setIsInitialLoad(false);
@@ -628,17 +635,70 @@ export default function PipedriveTab() {
     }
   };
 
+  // Utility: extract the most recent dd/mm/yyyy (or d/m/yyyy) date from the CSV text
+  const extractLatestDate = (csvText: string): Date | null => {
+    const lines = csvText
+      .trim()
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+
+    if (lines.length < 2) return null; // no data rows
+
+    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const tsIdx = headers.indexOf("timestamp");
+    if (tsIdx === -1) return null; // timestamp column not present
+
+    let max: Date | null = null;
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(",");
+      if (parts.length <= tsIdx) continue;
+      const ts = parts[tsIdx].trim();
+      if (!ts) continue;
+
+      const dmy = ts.split("/");
+      if (dmy.length !== 3) continue;
+      const [dayStr, monthStr, yearStr] = dmy;
+      const day = parseInt(dayStr, 10);
+      const month = parseInt(monthStr, 10) - 1; // zero-based month
+      const year = parseInt(yearStr, 10);
+      if (isNaN(day) || isNaN(month) || isNaN(year)) continue;
+
+      const dateObj = new Date(year, month, day);
+      if (!isNaN(dateObj.getTime()) && (max === null || dateObj > max)) {
+        max = dateObj;
+      }
+    }
+    return max;
+  };
+
   const loadLandIQData = async () => {
     try {
-      const response = await fetch("/20250725_landiQSDKeventsDate.csv");
+      // First attempt to fetch the current CSV without a date prefix
+      let response = await fetch("/landiQSDKeventsDate.csv");
+
+      // If that fails (e.g. older deployments), fall back to the dated filename
+      if (!response.ok) {
+        response = await fetch("/20250725_landiQSDKeventsDate.csv");
+      }
+
       if (!response.ok) {
         throw new Error("Failed to load CSV data");
       }
       const csvText = await response.text();
+
+      const latest = extractLatestDate(csvText);
+      if (latest) {
+        setLatestEventDate(latest);
+      }
+
       return parseLandIQData(csvText);
     } catch (error) {
       console.error("Failed to load Land iQ data:", error);
       // Fallback to hardcoded sample data
+      const latest = extractLatestDate(FALLBACK_LANDIQ_DATA);
+      if (latest) {
+        setLatestEventDate(latest);
+      }
       return parseLandIQData(FALLBACK_LANDIQ_DATA);
     }
   };
@@ -847,7 +907,7 @@ export default function PipedriveTab() {
         setLoadingProgress(50);
         setLoadingMessage("Loading Land iQ usage data...");
       }
-      
+
       // Load Land iQ usage data from CSV
       const landiqData = await loadLandIQData();
       console.log(`Loaded ${landiqData.length} Land iQ event records from CSV`);
@@ -925,7 +985,9 @@ export default function PipedriveTab() {
       console.log("  Sample emails:", uniqueEmails.slice(0, 10));
 
       // Filter out trial accounts if the toggle is off
-      const filteredLandiqData = landiqData.filter((item) => !item.name.includes("TrialAccount"));
+      const filteredLandiqData = landiqData.filter(
+        (item) => !item.name.includes("TrialAccount")
+      );
 
       console.log(
         `Filtered data: ${filteredLandiqData.length} records (from ${landiqData.length} total, showing trial accounts: false)`
@@ -1116,7 +1178,7 @@ export default function PipedriveTab() {
         `Dashboard loaded: ${totalUsers} users, ${totalOrganisations} orgs, ${totalEvents} events`
       );
       setLastRefresh(new Date());
-      
+
       // Complete the loading
       if (isInitialLoad) {
         setLoadingProgress(100);
@@ -1160,6 +1222,49 @@ export default function PipedriveTab() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const runDiagnostics = async () => {
+    setShowDiagnostics(true);
+    try {
+      console.log("Running Pipedrive diagnostics...");
+
+      // Run health check
+      const healthCheck = await pipedriveService.healthCheck();
+      console.log("Health check results:", healthCheck);
+
+      // Run connection test
+      const connectionTest = await pipedriveService.testConnection();
+      console.log("Connection test result:", connectionTest);
+
+      const results = {
+        healthCheck,
+        connectionTest,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+      };
+
+      setDiagnosticResults(results);
+
+      toast({
+        title: "Diagnostics Complete",
+        description: "Check the diagnostic panel below for details.",
+      });
+    } catch (error) {
+      console.error("Diagnostic error:", error);
+      setDiagnosticResults({
+        error: error instanceof Error ? error.message : "Diagnostic failed",
+        timestamp: new Date().toISOString(),
+      });
+
+      toast({
+        title: "Diagnostic Failed",
+        description:
+          "Unable to run diagnostics. Check browser console for details.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1250,17 +1355,15 @@ export default function PipedriveTab() {
                   <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin" />
                 </div>
               </div>
-              
+
               {/* Title */}
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold text-gray-900">
                   Loading Land iQ Dashboard
                 </h2>
-                <p className="text-gray-600 text-sm">
-                  {loadingMessage}
-                </p>
+                <p className="text-gray-600 text-sm">{loadingMessage}</p>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="space-y-2">
                 <Progress value={loadingProgress} className="h-2" />
@@ -1269,42 +1372,46 @@ export default function PipedriveTab() {
                   <span>{loadingProgress}%</span>
                 </div>
               </div>
-              
+
               {/* Loading Steps */}
               <div className="space-y-3">
-                <LoadingStep 
-                  completed={loadingProgress > 0} 
+                <LoadingStep
+                  completed={loadingProgress > 0}
                   active={loadingProgress >= 0 && loadingProgress < 20}
                   text="Checking Pipedrive connection"
                 />
-                <LoadingStep 
-                  completed={loadingProgress > 20} 
+                <LoadingStep
+                  completed={loadingProgress > 20}
                   active={loadingProgress >= 20 && loadingProgress < 40}
                   text="Extracting customer mappings"
                 />
-                <LoadingStep 
-                  completed={loadingProgress > 50} 
+                <LoadingStep
+                  completed={loadingProgress > 50}
                   active={loadingProgress >= 40 && loadingProgress < 60}
                   text="Loading usage data"
                 />
-                <LoadingStep 
-                  completed={loadingProgress > 60} 
+                <LoadingStep
+                  completed={loadingProgress > 60}
                   active={loadingProgress >= 60 && loadingProgress < 80}
                   text="Fetching organisation data"
                 />
-                <LoadingStep 
-                  completed={loadingProgress > 80} 
+                <LoadingStep
+                  completed={loadingProgress > 80}
                   active={loadingProgress >= 80 && loadingProgress < 100}
                   text="Analysing and processing"
                 />
               </div>
-              
+
               {/* Fun fact or tip */}
               <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
                 <p className="font-medium mb-1">Did you know?</p>
                 <p className="text-xs">
-                  This dashboard analyses over {totalStats.totalEvents > 0 ? totalStats.totalEvents.toLocaleString() : "20,000"} user events 
-                  to provide insights into Land iQ usage patterns across organisations.
+                  This dashboard analyses over{" "}
+                  {totalStats.totalEvents > 0
+                    ? totalStats.totalEvents.toLocaleString()
+                    : "20,000"}{" "}
+                  user events to provide insights into Land iQ usage patterns
+                  across organisations.
                 </p>
               </div>
             </div>
@@ -1356,7 +1463,16 @@ export default function PipedriveTab() {
               User activity by organisation with Land iQ usage analytics
             </p>
             <p className="text-gray-500 text-xs mt-1">
-              Event data as at 25 July 2025
+              {latestEventDate
+                ? `Event data as at ${latestEventDate.toLocaleDateString(
+                    "en-GB",
+                    {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    }
+                  )}`
+                : "Event data"}
             </p>
           </div>
           <div className="flex items-center space-x-2 flex-wrap">
@@ -1381,6 +1497,18 @@ export default function PipedriveTab() {
                 </Button>
               )}
             </div>
+
+            {connectionStatus === "disconnected" && (
+              <Button
+                onClick={runDiagnostics}
+                variant="outline"
+                size="sm"
+                className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+              >
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Diagnose Issue
+              </Button>
+            )}
 
             <Button
               onClick={handleRefreshData}
@@ -1460,6 +1588,147 @@ export default function PipedriveTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Diagnostic Panel */}
+      {showDiagnostics && (
+        <Card className="mb-4 p-4 border-orange-200 bg-orange-50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-orange-800">
+              Pipedrive Connection Diagnostics
+            </h3>
+            <Button
+              onClick={() => setShowDiagnostics(false)}
+              variant="ghost"
+              size="sm"
+              className="text-orange-600 hover:text-orange-800"
+            >
+              ×
+            </Button>
+          </div>
+
+          {diagnosticResults ? (
+            <div className="space-y-4">
+              {diagnosticResults.error ? (
+                <div className="bg-red-100 border border-red-300 rounded p-3">
+                  <p className="text-red-800 font-medium">Diagnostic Error:</p>
+                  <p className="text-red-700 text-sm">
+                    {diagnosticResults.error}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Health Check Results */}
+                  <div className="bg-white rounded border p-3">
+                    <h4 className="font-medium text-gray-800 mb-2">
+                      Configuration Check:
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">
+                          API Key Configured:
+                        </span>
+                        <span
+                          className={`ml-2 font-medium ${
+                            diagnosticResults.healthCheck?.config?.hasApiKey
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {diagnosticResults.healthCheck?.config?.hasApiKey
+                            ? "Yes"
+                            : "No"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">API Key Length:</span>
+                        <span className="ml-2 font-medium text-gray-800">
+                          {diagnosticResults.healthCheck?.config
+                            ?.apiKeyLength || 0}{" "}
+                          characters
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Domain:</span>
+                        <span className="ml-2 font-medium text-gray-800">
+                          {diagnosticResults.healthCheck?.config?.domain}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Environment:</span>
+                        <span className="ml-2 font-medium text-gray-800">
+                          {diagnosticResults.healthCheck?.config?.nodeEnv}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Connection Test Results */}
+                  <div className="bg-white rounded border p-3">
+                    <h4 className="font-medium text-gray-800 mb-2">
+                      Connection Test:
+                    </h4>
+                    <div className="text-sm">
+                      <span className="text-gray-600">Status:</span>
+                      <span
+                        className={`ml-2 font-medium ${
+                          diagnosticResults.connectionTest
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {diagnosticResults.connectionTest
+                          ? "Connected"
+                          : "Failed"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Troubleshooting Guide */}
+                  {!diagnosticResults.healthCheck?.config?.hasApiKey && (
+                    <div className="bg-yellow-100 border border-yellow-300 rounded p-3">
+                      <h4 className="font-medium text-yellow-800 mb-2">
+                        🔧 How to Fix:
+                      </h4>
+                      <div className="text-yellow-700 text-sm space-y-2">
+                        <p>
+                          <strong>1. Get your Pipedrive API Key:</strong>
+                        </p>
+                        <ul className="list-disc list-inside ml-4 space-y-1">
+                          <li>Log into your Pipedrive account</li>
+                          <li>Go to Settings → Personal → API</li>
+                          <li>Copy your API token</li>
+                        </ul>
+                        <p>
+                          <strong>2. Set Environment Variable:</strong>
+                        </p>
+                        <p className="font-mono bg-yellow-200 p-1 rounded">
+                          PIPEDRIVE_API_KEY=your_api_token_here
+                        </p>
+                        <p>
+                          <strong>3. For Vercel deployment:</strong>
+                        </p>
+                        <p className="font-mono bg-yellow-200 p-1 rounded">
+                          vercel env add PIPEDRIVE_API_KEY
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-500">
+                    Diagnostic run at:{" "}
+                    {new Date(diagnosticResults.timestamp).toLocaleString()}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-orange-600" />
+              <p className="text-orange-700">Running diagnostics...</p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Chart Section */}
       <Card className="mb-4 p-4">
@@ -1814,13 +2083,23 @@ export default function PipedriveTab() {
   );
 }
 
-function LoadingStep({ completed, active, text }: { completed: boolean; active: boolean; text: string }) {
+function LoadingStep({
+  completed,
+  active,
+  text,
+}: {
+  completed: boolean;
+  active: boolean;
+  text: string;
+}) {
   return (
     <div className="flex items-center space-x-3">
-      <div className={`
+      <div
+        className={`
         w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300
-        ${completed ? 'bg-green-500' : active ? 'bg-blue-500' : 'bg-gray-300'}
-      `}>
+        ${completed ? "bg-green-500" : active ? "bg-blue-500" : "bg-gray-300"}
+      `}
+      >
         {completed ? (
           <CheckCircle className="w-4 h-4 text-white" />
         ) : active ? (
@@ -1829,10 +2108,18 @@ function LoadingStep({ completed, active, text }: { completed: boolean; active: 
           <div className="w-2 h-2 bg-white rounded-full" />
         )}
       </div>
-      <span className={`
+      <span
+        className={`
         text-sm transition-all duration-300
-        ${completed ? 'text-green-700 font-medium' : active ? 'text-blue-700 font-medium' : 'text-gray-500'}
-      `}>
+        ${
+          completed
+            ? "text-green-700 font-medium"
+            : active
+            ? "text-blue-700 font-medium"
+            : "text-gray-500"
+        }
+      `}
+      >
         {text}
       </span>
     </div>

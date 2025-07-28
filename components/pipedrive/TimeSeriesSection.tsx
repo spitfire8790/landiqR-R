@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
+import { fetchGiraffeUsageData } from "@/lib/giraffe-usage-service";
+import OrganisationRecencyBoxplot from "@/components/OrganisationRecencyBoxplot";
 
 interface DailyCount {
   date: string; // yyyy-mm-dd
@@ -59,7 +61,9 @@ interface CombinedTimelinePoint {
   activities: number;
 }
 
-const CSV_URL = "/20250725_landiQSDKeventsDate.csv";
+// Primary path to the Land iQ events CSV (without date prefix). If the file isn't
+// found (older deployments), the code that fetches it can still fall back.
+const CSV_URL = "/landiQSDKeventsDate.csv";
 
 interface TimeSeriesSectionProps {
   eventFilter: string; // e.g. "All Events" or specific display label
@@ -103,6 +107,9 @@ export default function TimeSeriesSection({
   );
   const [showAverage, setShowAverage] = useState(true);
   const [multiSelectOpen, setMultiSelectOpen] = useState(false);
+  const [giraffeActive, setGiraffeActive] = useState<Record<string, number>>(
+    {}
+  );
 
   // Helper: safely extract the primary email string from a Pipedrive person record
   const extractPrimaryEmail = (person: any): string => {
@@ -146,7 +153,12 @@ export default function TimeSeriesSection({
   const loadData = async () => {
     // Load Land iQ CSV
     try {
-      const csvResp = await fetch(CSV_URL);
+      let csvResp = await fetch(CSV_URL);
+      if (!csvResp.ok) {
+        // Fallback to older dated filename used by previous deployments
+        csvResp = await fetch("/20250725_landiQSDKeventsDate.csv");
+      }
+
       const csvText = await csvResp.text();
 
       // Fetch Pipedrive persons for job titles mapping
@@ -217,6 +229,14 @@ export default function TimeSeriesSection({
       }
     } catch (err) {
       console.error("Failed to load CSV for time-series charts", err);
+    }
+
+    /* NEW: fetch Giraffe usage CSV for overlay */
+    try {
+      const giraffeData = await fetchGiraffeUsageData();
+      setGiraffeActive(giraffeData.activeCounts);
+    } catch (err) {
+      console.warn("Could not load Giraffe usage data for overlay", err);
     }
 
     // Fetch Pipedrive activities (client-side safe)
@@ -644,6 +664,29 @@ export default function TimeSeriesSection({
   };
 
   /* ---------------- RENDER ---------------- */
+  // Build combined trend dataset (Land iQ events + Giraffe active users)
+  const combinedTrend = React.useMemo(() => {
+    const mapEvents = new Map(dailyEvents.map((d) => [d.date, d.count]));
+    const dates = Array.from(
+      new Set([
+        ...dailyEvents.map((d) => d.date),
+        ...Object.keys(giraffeActive),
+      ])
+    ).sort();
+
+    let lastActive = 0;
+    return dates.map((date) => {
+      if (giraffeActive[date] !== undefined) {
+        lastActive = giraffeActive[date];
+      }
+      return {
+        date,
+        events: mapEvents.get(date) || 0,
+        active: lastActive,
+      };
+    });
+  }, [dailyEvents, giraffeActive]);
+
   return (
     <>
       {/* 1. Land iQ Usage Trend */}
@@ -663,7 +706,7 @@ export default function TimeSeriesSection({
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={dailyEvents}
+                data={combinedTrend}
                 margin={{ top: 20, right: 30, bottom: 20, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
@@ -674,12 +717,28 @@ export default function TimeSeriesSection({
                 />
                 <YAxis />
                 <RechartsTooltip content={<CustomTooltip />} />
-                <RechartsLegend />
+                <RechartsLegend
+                  formatter={(value: string) =>
+                    value === "Giraffe Active Users" ? (
+                      <span title="Number of users whose Last-Seen date in this snapshot is later than in the previous snapshot (i.e. newly active since last capture).">
+                        {value}
+                      </span>
+                    ) : (
+                      value
+                    )
+                  }
+                />
                 <Line
                   type="monotone"
-                  dataKey="count"
+                  dataKey="events"
                   stroke="#1d4ed8"
-                  name="Events"
+                  name="Land iQ Events"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="active"
+                  stroke="#f97316"
+                  name="Giraffe Active Users"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -1015,6 +1074,7 @@ export default function TimeSeriesSection({
           </>
         )}
       </Card>
+      <OrganisationRecencyBoxplot />
     </>
   );
 }

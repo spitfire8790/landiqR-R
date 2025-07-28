@@ -7,6 +7,7 @@ import React, {
   useState,
   useRef,
 } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getUserRole, ensureUserRolesTable } from "@/lib/user-management";
 
@@ -27,14 +28,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Timeout utility
+// Resolve or reject the promise within the given timeframe, making sure to
+// clear the timer once the promise settles so we do **not** create lingering
+// rejected promises that could surface as "unhandled rejection" errors.
 const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Operation timed out")), ms)
-    ),
-  ]);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Operation timed out")),
+      ms
+    );
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -43,6 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Next.js router for client-side redirects when a session becomes available
+  const router = useRouter();
 
   // Cache to prevent redundant role checks
   const roleCache = useRef<Map<string, { role: UserRole; timestamp: number }>>(
@@ -97,13 +113,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await withTimeout(supabase.auth.getSession(), 30000);
         const currentSession = data.session;
-        setIsAuthenticated(!!currentSession);
+        const hasSession = !!currentSession;
+        setIsAuthenticated(hasSession);
 
         if (currentSession) {
           const role = await deriveRoleFromSession(currentSession);
           setUserRole(role);
           setUserId(currentSession.user.id);
           setUserEmail(currentSession.user.email || null);
+
+          // If we previously redirected to /login but actually have a session,
+          // send the user back to the main dashboard immediately.
+          if (hasSession) {
+            router.replace("/");
+          }
         }
       } catch (error) {
         console.error("Auth initialization failed:", error);
@@ -121,7 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setIsAuthenticated(!!session);
+        const hasSession = !!session;
+        setIsAuthenticated(hasSession);
 
         if (session) {
           try {
@@ -129,6 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserRole(role);
             setUserId(session.user.id);
             setUserEmail(session.user.email || null);
+
+            // Ensure authenticated users are never left on the login page.
+            router.replace("/");
           } catch (error) {
             console.error("Error updating auth state:", error);
             // Don't fail completely - set basic auth without role

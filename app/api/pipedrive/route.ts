@@ -5,6 +5,15 @@ const PIPEDRIVE_API_KEY = process.env.PIPEDRIVE_API_KEY;
 const PIPEDRIVE_DOMAIN = process.env.PIPEDRIVE_COMPANY_DOMAIN || 'landiq';
 const PIPEDRIVE_BASE_URL = `https://${PIPEDRIVE_DOMAIN}.pipedrive.com/api/v1`;
 
+// Environment validation logging
+console.log('Pipedrive API Configuration:', {
+  hasApiKey: !!PIPEDRIVE_API_KEY,
+  apiKeyLength: PIPEDRIVE_API_KEY ? PIPEDRIVE_API_KEY.length : 0,
+  domain: PIPEDRIVE_DOMAIN,
+  baseUrl: PIPEDRIVE_BASE_URL,
+  nodeEnv: process.env.NODE_ENV
+});
+
 // Rate limiting (simple in-memory implementation)
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 100; // 100ms between requests (10 requests per second)
@@ -22,26 +31,69 @@ async function rateLimit() {
 
 async function makePipedriveRequest(endpoint: string) {
   if (!PIPEDRIVE_API_KEY) {
-    throw new Error('Pipedrive API key not configured');
+    const error = 'Pipedrive API key not configured. Please set PIPEDRIVE_API_KEY environment variable.';
+    console.error('Configuration Error:', {
+      error,
+      availableEnvVars: Object.keys(process.env).filter(key => key.includes('PIPEDRIVE')),
+      nodeEnv: process.env.NODE_ENV
+    });
+    throw new Error(error);
   }
 
   await rateLimit();
 
   const url = `${PIPEDRIVE_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_token=${PIPEDRIVE_API_KEY}`;
   
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+  console.log('Making Pipedrive request:', {
+    endpoint,
+    domain: PIPEDRIVE_DOMAIN,
+    urlLength: url.length,
+    hasApiKey: !!PIPEDRIVE_API_KEY
   });
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Land-iQ-Dashboard/1.0'
+      },
+    });
 
-  return response.json();
+    console.log('Pipedrive response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Pipedrive API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+        endpoint
+      });
+      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Pipedrive success response:', {
+      success: data.success,
+      dataLength: data.data ? data.data.length : 'no data array',
+      endpoint
+    });
+
+    return data;
+  } catch (fetchError) {
+    console.error('Fetch Error Details:', {
+      error: fetchError,
+      endpoint,
+      message: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'
+    });
+    throw fetchError;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -116,15 +168,35 @@ export async function POST(request: NextRequest) {
     const { action } = body;
 
     switch (action) {
+      case 'health-check':
+        return NextResponse.json({
+          success: true,
+          config: {
+            hasApiKey: !!PIPEDRIVE_API_KEY,
+            apiKeyLength: PIPEDRIVE_API_KEY ? PIPEDRIVE_API_KEY.length : 0,
+            domain: PIPEDRIVE_DOMAIN,
+            baseUrl: PIPEDRIVE_BASE_URL,
+            nodeEnv: process.env.NODE_ENV,
+            availablePipedriveEnvVars: Object.keys(process.env).filter(key => key.includes('PIPEDRIVE'))
+          }
+        });
+
       case 'test-connection':
         try {
-          await makePipedriveRequest('/users');
-          return NextResponse.json({ success: true, connected: true });
+          console.log('Testing Pipedrive connection...');
+          const result = await makePipedriveRequest('/users');
+          console.log('Connection test successful:', { 
+            success: result.success, 
+            dataLength: result.data ? result.data.length : 'no data' 
+          });
+          return NextResponse.json({ success: true, connected: true, result });
         } catch (error) {
+          console.error('Connection test failed:', error);
           return NextResponse.json({ 
             success: false, 
             connected: false, 
-            error: error instanceof Error ? error.message : 'Connection failed' 
+            error: error instanceof Error ? error.message : 'Connection failed',
+            details: error instanceof Error ? error.stack : undefined
           });
         }
 

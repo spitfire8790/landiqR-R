@@ -27,7 +27,7 @@ import {
   ChevronDown,
   Download,
   Activity,
-  Building2,
+  BarChart3,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
 import { CategoryDialog } from "@/components/category-dialog";
@@ -41,7 +41,6 @@ import HowToUseModal from "@/components/how-to-use-modal";
 import NotificationBell from "@/components/notification-bell";
 import PipedriveTab from "@/components/pipedrive/PipedriveTab";
 import { useAuth } from "@/contexts/auth-context";
-import dynamic from "next/dynamic";
 import type {
   Person,
   Category,
@@ -57,52 +56,7 @@ import PeopleTable from "@/components/people-table";
 import TasksView from "@/components/tasks-view";
 import WorkflowsTable from "@/components/workflows-table";
 import CalendarView from "@/components/calendar-view";
-
-// Lazy load the ResponsibilityChart for better performance
-const ResponsibilityChart = dynamic(
-  () => import("@/components/responsibility-chart"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="p-6 space-y-6 h-96">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <div className="w-48 h-8 bg-gray-200 rounded animate-pulse"></div>
-            <div className="w-64 h-4 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-          <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={`stat-${i}`}
-              className="p-4 border border-gray-200 rounded-lg"
-            >
-              <div className="space-y-2">
-                <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Chart Placeholder */}
-        <div className="p-6 border border-gray-200 rounded-lg">
-          <div className="mb-6">
-            <div className="w-48 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-          <div className="relative h-64">
-            <div className="h-full bg-gray-100 rounded animate-pulse"></div>
-          </div>
-        </div>
-      </div>
-    ),
-  }
-);
+import GiraffeDashboard from "@/components/GiraffeDashboard";
 
 import {
   fetchGroups,
@@ -135,6 +89,8 @@ import { initializeAdminUsers } from "@/lib/init-admin";
 
 import ActivityFeed from "@/components/activity-feed";
 import CollaborationIndicators from "@/components/collaboration-indicators";
+
+const SHOW_GIRAFFE = false;
 
 export default function Dashboard() {
   // State variables
@@ -1063,18 +1019,6 @@ export default function Dashboard() {
                 Workflows
               </button>
               <button
-                onClick={() => setActiveTab("analytics")}
-                className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                  activeTab === "analytics"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                )}
-              >
-                <BarChart className="mr-3 h-4 w-4" />
-                Analytics
-              </button>
-              <button
                 onClick={() => setActiveTab("pipedrive")}
                 className={cn(
                   "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
@@ -1083,9 +1027,23 @@ export default function Dashboard() {
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
               >
-                <Building2 className="mr-3 h-4 w-4" />
-                Pipedrive
+                <BarChart className="mr-3 h-4 w-4" />
+                Analytics
               </button>
+              {SHOW_GIRAFFE && (
+                <button
+                  onClick={() => setActiveTab("giraffe")}
+                  className={cn(
+                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                    activeTab === "giraffe"
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  <BarChart3 className="mr-3 h-4 w-4" />
+                  Giraffe
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("activity")}
                 className={cn(
@@ -1171,8 +1129,7 @@ export default function Dashboard() {
               { key: "orgchart", icon: Grid3X3, label: "Chart" },
               { key: "people", icon: Users, label: "People" },
               { key: "tasks", icon: CheckSquare, label: "Tasks" },
-              { key: "analytics", icon: BarChart, label: "Analytics" },
-              { key: "pipedrive", icon: Building2, label: "Pipedrive" },
+              { key: "pipedrive", icon: BarChart, label: "Analytics" },
             ].map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1186,6 +1143,19 @@ export default function Dashboard() {
                 <span>{label}</span>
               </button>
             ))}
+            {SHOW_GIRAFFE && (
+              <button
+                key="giraffe"
+                onClick={() => setActiveTab("giraffe")}
+                className={cn(
+                  "flex flex-col items-center py-2 px-3 text-xs",
+                  activeTab === "giraffe" ? "text-blue-600" : "text-gray-500"
+                )}
+              >
+                <BarChart3 className="h-5 w-5 mb-1" />
+                <span>Giraffe</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1273,15 +1243,15 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === "analytics" && (
-            <div className="h-full w-full">
-              <ResponsibilityChart people={people} allocations={allocations} />
-            </div>
-          )}
-
           {activeTab === "pipedrive" && (
             <div className="h-full w-full">
               <PipedriveTab />
+            </div>
+          )}
+
+          {SHOW_GIRAFFE && activeTab === "giraffe" && (
+            <div className="h-full w-full overflow-auto">
+              <GiraffeDashboard />
             </div>
           )}
 

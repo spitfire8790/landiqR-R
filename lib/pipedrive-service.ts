@@ -239,10 +239,60 @@ export class PipedriveService {
   }
 
   /**
-   * Test API connection
+   * Health check for configuration validation
+   */
+  async healthCheck(): Promise<{
+    success: boolean;
+    config?: any;
+    error?: string;
+  }> {
+    try {
+      const response = await fetch('/api/pipedrive', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'health-check' }),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Pipedrive health check failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Health check failed'
+      };
+    }
+  }
+
+  /**
+   * Test API connection with enhanced error reporting
    */
   async testConnection(): Promise<boolean> {
     try {
+      // First, check configuration
+      const healthCheck = await this.healthCheck();
+      console.log('Pipedrive health check result:', healthCheck);
+
+      if (!healthCheck.success) {
+        console.error('Health check failed:', healthCheck.error);
+        return false;
+      }
+
+      if (!healthCheck.config?.hasApiKey) {
+        console.error('Pipedrive API key not configured');
+        return false;
+      }
+
+      // Then test actual connection
       const response = await fetch('/api/pipedrive', {
         method: 'POST',
         headers: {
@@ -252,11 +302,19 @@ export class PipedriveService {
       });
 
       if (!response.ok) {
+        console.error('Connection test request failed:', response.status, response.statusText);
         return false;
       }
 
       const data = await response.json();
-      return data.success && data.connected;
+      
+      if (!data.success) {
+        console.error('Connection test failed:', data.error, data.details);
+        return false;
+      }
+
+      console.log('Pipedrive connection test successful');
+      return data.connected;
     } catch (error) {
       console.error('Pipedrive connection test failed:', error);
       return false;
@@ -533,9 +591,8 @@ export class PipedriveService {
         .map(([label, value]) => ({ label, value }))
         .sort((a, b) => b.value - a.value);
 
-      const customerTypeBreakdown: ChartDataPoint[] = Array.from(
-        customerTypeCounts.entries()
-      ).map(([label, value]) => ({ label, value }));
+      const customerTypeBreakdown: ChartDataPoint[] = Array.from(customerTypeCounts.entries())
+        .map(([label, value]) => ({ label, value }));
 
       // Licence utilisation data (unchanged)
       const licenceUtilisation: ChartDataPoint[] = organisations
