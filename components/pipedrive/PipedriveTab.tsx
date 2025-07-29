@@ -1401,19 +1401,6 @@ export default function PipedriveTab() {
                   text="Analysing and processing"
                 />
               </div>
-
-              {/* Fun fact or tip */}
-              <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
-                <p className="font-medium mb-1">Did you know?</p>
-                <p className="text-xs">
-                  This dashboard analyses over{" "}
-                  {totalStats.totalEvents > 0
-                    ? totalStats.totalEvents.toLocaleString()
-                    : "20,000"}{" "}
-                  user events to provide insights into Land iQ usage patterns
-                  across organisations.
-                </p>
-              </div>
             </div>
           </Card>
         </div>

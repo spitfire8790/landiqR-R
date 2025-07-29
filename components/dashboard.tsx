@@ -26,7 +26,6 @@ import {
   Calendar,
   ChevronDown,
   Download,
-  Activity,
   BarChart3,
 } from "lucide-react";
 import { GroupDialog } from "@/components/group-dialog";
@@ -87,7 +86,6 @@ import { cn } from "@/lib/utils";
 import { exportAllData } from "@/lib/export-service";
 import { initializeAdminUsers } from "@/lib/init-admin";
 
-import ActivityFeed from "@/components/activity-feed";
 import CollaborationIndicators from "@/components/collaboration-indicators";
 
 const SHOW_GIRAFFE = false;
@@ -1045,18 +1043,6 @@ export default function Dashboard() {
                 </button>
               )}
               <button
-                onClick={() => setActiveTab("activity")}
-                className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                  activeTab === "activity"
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                )}
-              >
-                <Activity className="mr-3 h-4 w-4" />
-                Activity
-              </button>
-              <button
                 onClick={() => setActiveTab("calendar")}
                 className={cn(
                   "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
@@ -1252,55 +1238,6 @@ export default function Dashboard() {
           {SHOW_GIRAFFE && activeTab === "giraffe" && (
             <div className="h-full w-full overflow-auto">
               <GiraffeDashboard />
-            </div>
-          )}
-
-          {activeTab === "activity" && (
-            <div className="h-full w-full p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                <div className="lg:col-span-2">
-                  <ActivityFeed
-                    className="h-full"
-                    people={people}
-                    groups={groups}
-                    tasks={tasks}
-                    categories={categories}
-                  />
-                </div>
-                <div className="space-y-6">
-                  <CollaborationIndicators
-                    className="p-4 bg-white rounded-lg border"
-                    showActivityDetails={true}
-                    maxVisible={8}
-                    people={people}
-                  />
-                  <div className="bg-white rounded-lg border p-4">
-                    <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Users:</span>
-                        <span className="font-medium">{people.length}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Active Groups:</span>
-                        <span className="font-medium">{groups.length}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Tasks:</span>
-                        <span className="font-medium">{tasks.length}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">
-                          Total Allocations:
-                        </span>
-                        <span className="font-medium">
-                          {allocations.length}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
