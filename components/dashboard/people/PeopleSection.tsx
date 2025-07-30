@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { PersonDialog } from "@/components/person-dialog";
+import { PersonDialog } from "@/components/modals/person-dialog";
 import PeopleTable from "@/components/people-table";
 import type { Person } from "@/lib/types";
 import { useCrud } from "@/hooks/use-crud";

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, ChevronUp, ChevronDown, Download } from "lucide-react";
-import { GroupDialog } from "@/components/group-dialog";
+import { GroupDialog } from "@/components/modals/group-dialog";
 import type { Group } from "@/lib/types";
 import {
   AlertDialog,

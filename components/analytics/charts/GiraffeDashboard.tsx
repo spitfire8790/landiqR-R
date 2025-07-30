@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
-import GiraffeUsageTrend from "@/components/GiraffeUsageTrend";
-import GiraffeInactivityHistogram from "@/components/GiraffeInactivityHistogram";
-import GiraffeOrganisationLeaderboard from "@/components/GiraffeOrganisationLeaderboard";
-import CrossProductMatrix from "@/components/CrossProductMatrix";
-import GiraffeCorrelationScatter from "@/components/GiraffeCorrelationScatter";
-import GiraffeAtRiskTable from "@/components/GiraffeAtRiskTable";
-import OrganisationRecencyBoxplot from "@/components/OrganisationRecencyBoxplot";
+import GiraffeUsageTrend from "./GiraffeUsageTrend";
+import GiraffeInactivityHistogram from "./GiraffeInactivityHistogram";
+import GiraffeOrganisationLeaderboard from "./GiraffeOrganisationLeaderboard";
+import CrossProductMatrix from "./CrossProductMatrix";
+import GiraffeCorrelationScatter from "./GiraffeCorrelationScatter";
+import GiraffeAtRiskTable from "./GiraffeAtRiskTable";
+import OrganisationRecencyBoxplot from "./OrganisationRecencyBoxplot";
 
 export default function GiraffeDashboard() {
   return (

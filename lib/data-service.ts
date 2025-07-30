@@ -2,11 +2,47 @@ import { supabase } from "@/lib/supabase"
 import type { Group, Category, Person, Allocation, Task, Responsibility, TaskAllocation, TaskSourceLink, WorkflowTool, Workflow, Leave, Comment, Notification } from "@/lib/types"
 import { v4 as uuidv4 } from "uuid"
 
+// Cache table existence check
+let tablesChecked = false;
+let tableCheckPromise: Promise<boolean> | null = null;
+
 // Check if tables exist and create them if they don't
 export async function ensureTablesExist() {
+  // If already checked and tables exist, return immediately
+  if (tablesChecked) {
+    return true;
+  }
+
+  // If check is already in progress, return the same promise
+  if (tableCheckPromise) {
+    return tableCheckPromise;
+  }
+
+  // Start the check
+  tableCheckPromise = performTableCheck();
+  const result = await tableCheckPromise;
+  
+  if (result) {
+    tablesChecked = true;
+  }
+  
+  return result;
+}
+
+async function performTableCheck(): Promise<boolean> {
   try {
-    // Check if the groups table exists
-    const { error: groupsError } = await supabase.from("groups").select("id").limit(1)
+    // Quick check: try to select from a simple table with minimal data
+    const { error: groupsError } = await supabase
+      .from("groups")
+      .select("id")
+      .limit(1)
+      .single()
+      .maybeSingle();
+
+    // If no error or error is just "no rows", tables exist
+    if (!groupsError || groupsError.code === 'PGRST116') {
+      return true;
+    }
 
     if (groupsError && groupsError.message.includes("does not exist")) {
       console.log("Tables don't exist. Creating tables...")
@@ -193,7 +229,14 @@ export async function ensureTablesExist() {
     return true
   } catch (error) {
     console.error("Error checking/creating tables:", error)
+    // Reset promise on error so it can be retried
+    tableCheckPromise = null;
     return false
+  } finally {
+    // Clear the promise reference if check failed
+    if (!tablesChecked) {
+      tableCheckPromise = null;
+    }
   }
 }
 

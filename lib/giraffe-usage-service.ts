@@ -1,7 +1,7 @@
 // Giraffe usage analytics helper – parses public/giraffeusagedata.csv and
 // exposes useful aggregations for charts and tables.
 
-import { differenceInCalendarDays, parse } from "date-fns";
+import { differenceInCalendarDays, parse, parseISO } from "date-fns";
 
 export interface GiraffeUserSnapshot {
   email: string;
@@ -81,9 +81,12 @@ export function parseGiraffeCsv(csv: string): GiraffeUsageData {
         // Record appearance
         user.appearances[snapIso] = cell;
 
-        // Update first/last seen helpers
-        if (!user.firstSeen) user.firstSeen = snapIso;
-        user.lastSeen = snapIso; // snapshots are chronological left→right
+        // Update first/last seen helpers - use the actual activity date from the cell
+        if (!user.firstSeen) user.firstSeen = cellIso;
+        // For lastSeen, use the latest activity date (cellIso), not the snapshot date
+        if (!user.lastSeen || cellIso > user.lastSeen) {
+          user.lastSeen = cellIso;
+        }
 
         // Determine activity compared to previous snapshot
         if (prevDateIso === null || cellIso > prevDateIso) {
@@ -107,7 +110,14 @@ export function parseGiraffeCsv(csv: string): GiraffeUsageData {
 export function daysSinceLastSeen(isoDate: string | undefined): number | null {
   if (!isoDate) return null;
   const last = parseISO(isoDate);
-  return differenceInCalendarDays(new Date(), last);
+  const days = differenceInCalendarDays(new Date(), last);
+  
+  // If the date is in the future (negative days), treat as 0 days (very recent)
+  if (days < 0) {
+    return 0;
+  }
+  
+  return days;
 }
 
 /** Convert a header like "11-Mar-24" or "26-Nov-2024" to ISO yyyy-mm-dd. */
@@ -124,6 +134,4 @@ function normaliseHeaderDate(raw: string): string {
     return alt.toISOString().slice(0, 10);
   }
   return parsed.toISOString().slice(0, 10);
-}
-
-import { parseISO } from "date-fns"; 
+} 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HelpCircle } from "lucide-react";
-import HowToUseModal from "@/components/how-to-use-modal";
+import HowToUseModal from "@/components/modals/how-to-use-modal";
 
 export default function HowToUseButton() {
   const [modalOpen, setModalOpen] = useState(false);

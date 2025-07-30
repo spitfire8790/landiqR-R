@@ -43,7 +43,7 @@ import dynamic from "next/dynamic";
 
 const WorkflowBuilderProvider = dynamic(
   () =>
-    import("@/components/workflow-builder").then(
+    import("@/components/workflows/workflow-builder").then(
       (mod) => mod.WorkflowBuilderProvider
     ),
   {

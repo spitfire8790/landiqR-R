@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CategoryDialog } from "@/components/category-dialog";
+import { CategoryDialog } from "@/components/modals/category-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from "framer-motion";
 import { exportCategories } from "@/lib/export-service";

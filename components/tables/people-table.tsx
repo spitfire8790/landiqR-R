@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, ChevronUp, ChevronDown, Download } from "lucide-react";
-import { PersonDialog } from "@/components/person-dialog";
+import { PersonDialog } from "@/components/modals/person-dialog";
 import type { Person } from "@/lib/types";
 import {
   AlertDialog,

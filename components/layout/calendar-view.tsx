@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LeaveDialog } from "@/components/leave-dialog";
+import { LeaveDialog } from "@/components/modals/leave-dialog";
 import { fetchLeave } from "@/lib/data-service";
 import { exportLeave } from "@/lib/export-service";
 import type {

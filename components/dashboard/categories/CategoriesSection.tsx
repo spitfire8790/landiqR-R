@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { CategoryDialog } from "@/components/category-dialog";
-import CategoriesTable from "@/components/categories-table";
+import { CategoryDialog } from "@/components/modals/category-dialog";
+import CategoriesTable from "@/components/tables/categories-table";
 import type { Category, Group } from "@/lib/types";
 import { createToastHelpers } from "@/lib/toast";
 import {

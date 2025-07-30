@@ -1,4 +1,4 @@
-import GiraffeDashboard from "@/components/GiraffeDashboard";
+import GiraffeDashboard from "@/components/analytics/charts/GiraffeDashboard";
 
 export const metadata = {
   title: "Giraffe Analytics",

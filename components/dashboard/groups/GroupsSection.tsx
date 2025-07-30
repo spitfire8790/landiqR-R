@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { GroupDialog } from "@/components/group-dialog";
-import GroupsTable from "@/components/groups-table";
+import { GroupDialog } from "@/components/modals/group-dialog";
+import GroupsTable from "@/components/tables/groups-table";
 import type { Group } from "@/lib/types";
 import { createToastHelpers } from "@/lib/toast";
 import { createGroup, updateGroup, deleteGroup } from "@/lib/data-service";

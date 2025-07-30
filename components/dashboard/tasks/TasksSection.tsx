@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import TasksView from "@/components/tasks-view";
-import { SimpleTaskDialog } from "@/components/simple-task-dialog";
+import { SimpleTaskDialog } from "@/components/modals/simple-task-dialog";
 import type { Group, Category, Person, Task } from "@/lib/types";
 
 interface TasksSectionProps {

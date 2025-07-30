@@ -23,7 +23,7 @@ import {
 import type { Responsibility, Person } from "@/lib/types";
 import { getOrganizationLogo } from "@/lib/utils";
 import Image from "next/image";
-import CommentThread from "@/components/comment-thread";
+import CommentThread from "@/components/layout/comment-thread";
 
 interface ResponsibilityDialogProps {
   open: boolean;

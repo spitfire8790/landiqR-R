@@ -35,7 +35,7 @@ import {
   updateTaskSourceLink,
   deleteTaskSourceLink,
 } from "@/lib/data-service";
-import CommentThread from "@/components/comment-thread";
+import CommentThread from "@/components/layout/comment-thread";
 import { useAuth } from "@/contexts/auth-context";
 
 interface TaskDialogProps {

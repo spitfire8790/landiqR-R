@@ -27,17 +27,21 @@ import {
   ChevronDown,
   Download,
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
-import { GroupDialog } from "@/components/group-dialog";
-import { CategoryDialog } from "@/components/category-dialog";
-import { PersonDialog } from "@/components/person-dialog";
-import { AllocationDialog } from "@/components/allocation-dialog";
-import { SimpleTaskDialog } from "@/components/simple-task-dialog";
-import { WorkflowDialog } from "@/components/workflow-dialog";
-import DraggableChatModal from "@/components/draggable-chat-modal";
-import HowToUseButton from "@/components/how-to-use-button";
-import HowToUseModal from "@/components/how-to-use-modal";
-import NotificationBell from "@/components/notification-bell";
+import { GroupDialog } from "@/components/modals/group-dialog";
+import { CategoryDialog } from "@/components/modals/category-dialog";
+import { PersonDialog } from "@/components/modals/person-dialog";
+import { AllocationDialog } from "@/components/modals/allocation-dialog";
+import { SimpleTaskDialog } from "@/components/modals/simple-task-dialog";
+import { WorkflowDialog } from "@/components/modals/workflow-dialog";
+import DraggableChatModal from "@/components/modals/draggable-chat-modal";
+import HowToUseButton from "@/components/ui/how-to-use-button";
+import HowToUseModal from "@/components/modals/how-to-use-modal";
+import NotificationBell from "@/components/ui/notification-bell";
 import PipedriveTab from "@/components/pipedrive/PipedriveTab";
 import { useAuth } from "@/contexts/auth-context";
 import type {
@@ -48,14 +52,15 @@ import type {
   Task,
   TaskAllocation,
 } from "@/lib/types";
-import OrgChart from "@/components/org-chart";
-import GroupsTable from "@/components/groups-table";
-import CategoriesTable from "@/components/categories-table";
-import PeopleTable from "@/components/people-table";
-import TasksView from "@/components/tasks-view";
-import WorkflowsTable from "@/components/workflows-table";
-import CalendarView from "@/components/calendar-view";
-import GiraffeDashboard from "@/components/GiraffeDashboard";
+import OrgChart from "@/components/charts/org-chart";
+import GroupsTable from "@/components/tables/groups-table";
+import CategoriesTable from "@/components/tables/categories-table";
+import PeopleTable from "@/components/tables/people-table";
+import TasksView from "@/components/layout/tasks-view";
+import WorkflowsTable from "@/components/tables/workflows-table";
+import CalendarView from "@/components/layout/calendar-view";
+import GiraffeDashboard from "@/components/analytics/charts/GiraffeDashboard";
+import JiraAnalytics from "@/components/jira/JiraAnalytics";
 
 import {
   fetchGroups,
@@ -86,9 +91,10 @@ import { cn } from "@/lib/utils";
 import { exportAllData } from "@/lib/export-service";
 import { initializeAdminUsers } from "@/lib/init-admin";
 
-import CollaborationIndicators from "@/components/collaboration-indicators";
+import CollaborationIndicators from "@/components/ui/collaboration-indicators";
 
 const SHOW_GIRAFFE = false;
+const SHOW_CROSS_PLATFORM_ANALYTICS = false;
 
 export default function Dashboard() {
   // State variables
@@ -107,6 +113,9 @@ export default function Dashboard() {
   // Add refs to prevent redundant operations
   const initializationAttempted = useRef(false);
   const adminInitialized = useRef(false);
+
+  // Sidebar collapse state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Export handler for all data
   const handleExportAll = async () => {
@@ -281,52 +290,47 @@ export default function Dashboard() {
       setLoading(true);
       try {
         // First try to ensure tables exist with timeout
-        const tablesExist = await withTimeout(ensureTablesExist(), 30000);
+        const tablesExist = await withTimeout(ensureTablesExist(), 10000);
         setDbInitialized(tablesExist);
         initializationAttempted.current = true;
 
-        // Initialize admin users from hardcoded list (only once)
+        // Initialize admin users in background (non-blocking)
         if (!adminInitialized.current) {
-          try {
-            await withTimeout(initializeAdminUsers(), 15000);
-            adminInitialized.current = true;
-          } catch (error) {
-            console.warn(
-              "Admin initialization failed, continuing without:",
-              error
+          initializeAdminUsers()
+            .then(() => {
+              adminInitialized.current = true;
+            })
+            .catch((error) =>
+              console.warn("Admin initialization failed:", error)
             );
-            // Don't block the app for admin initialization failures
-          }
         }
 
         if (tablesExist) {
           // If tables exist, fetch data with timeout and parallel execution
           try {
-            const [
-              groupsData,
-              categoriesData,
-              peopleData,
-              allocationsData,
-              tasksData,
-              taskAllocationsData,
-            ] = await withTimeout(
-              Promise.all([
-                fetchGroups(),
-                fetchCategories(),
-                fetchPeople(),
-                fetchAllocations(),
-                fetchTasks(),
-                fetchTaskAllocations(),
-              ]),
-              20000
+            const [groupsData, categoriesData, peopleData] = await withTimeout(
+              Promise.all([fetchGroups(), fetchCategories(), fetchPeople()]),
+              8000
             );
 
             setGroups(groupsData);
             setCategories(categoriesData);
             setPeople(peopleData);
-            setAllocations(allocationsData);
-            setTasks(tasksData);
-            setTaskAllocations(taskAllocationsData);
+
+            // Load other data in background
+            Promise.all([
+              fetchAllocations(),
+              fetchTasks(),
+              fetchTaskAllocations(),
+            ])
+              .then(([allocationsData, tasksData, taskAllocationsData]) => {
+                setAllocations(allocationsData);
+                setTasks(tasksData);
+                setTaskAllocations(taskAllocationsData);
+              })
+              .catch((error) => {
+                console.error("Error loading secondary data:", error);
+              });
           } catch (dataError) {
             console.error("Error fetching data:", dataError);
             toast({
@@ -367,7 +371,7 @@ export default function Dashboard() {
   const initializeDatabase = async () => {
     setInitializingDb(true);
     try {
-      const success = await withTimeout(ensureTablesExist(), 45000);
+      const success = await withTimeout(ensureTablesExist(), 15000);
       setDbInitialized(success);
       initializationAttempted.current = true;
 
@@ -940,170 +944,305 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar Navigation */}
-        <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex-shrink-0 hidden sm:flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-800 mb-4">Navigation</h2>
+        <div
+          className={cn(
+            "bg-white shadow-lg border-r border-gray-200 flex-shrink-0 hidden sm:flex flex-col transition-all duration-300 ease-in-out",
+            sidebarCollapsed ? "w-16" : "w-64"
+          )}
+        >
+          {/* Sidebar Header with Toggle */}
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            {!sidebarCollapsed && (
+              <h2 className="font-semibold text-gray-800">Navigation</h2>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1 h-8 w-8 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          {/* Navigation Items */}
+          <div className="p-4 flex-1">
             <nav className="space-y-2">
               <button
                 onClick={() => setActiveTab("orgchart")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "orgchart"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Org Chart" : ""}
               >
-                <Grid3X3 className="mr-3 h-4 w-4" />
-                Org Chart
+                <Grid3X3
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Org Chart"}
               </button>
               <button
                 onClick={() => setActiveTab("groups")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "groups"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Groups" : ""}
               >
-                <Layers className="mr-3 h-4 w-4" />
-                Groups
+                <Layers
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Groups"}
               </button>
               <button
                 onClick={() => setActiveTab("categories")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "categories"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Categories" : ""}
               >
-                <Database className="mr-3 h-4 w-4" />
-                Categories
+                <Database
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Categories"}
               </button>
               <button
                 onClick={() => setActiveTab("people")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "people"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "People" : ""}
               >
-                <Users className="mr-3 h-4 w-4" />
-                People
+                <Users className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")} />
+                {!sidebarCollapsed && "People"}
               </button>
               <button
                 onClick={() => setActiveTab("tasks")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "tasks"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Tasks" : ""}
               >
-                <CheckSquare className="mr-3 h-4 w-4" />
-                Tasks
+                <CheckSquare
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Tasks"}
               </button>
               <button
                 onClick={() => setActiveTab("workflows")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "workflows"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Workflows" : ""}
               >
-                <GitBranch className="mr-3 h-4 w-4" />
-                Workflows
+                <GitBranch
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Workflows"}
               </button>
               <button
                 onClick={() => setActiveTab("pipedrive")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "pipedrive"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Analytics" : ""}
               >
-                <BarChart className="mr-3 h-4 w-4" />
-                Analytics
+                <BarChart
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Analytics"}
               </button>
               {SHOW_GIRAFFE && (
                 <button
                   onClick={() => setActiveTab("giraffe")}
                   className={cn(
-                    "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                    "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                    sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                     activeTab === "giraffe"
                       ? "bg-blue-100 text-blue-700"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                   )}
+                  title={sidebarCollapsed ? "Giraffe" : ""}
                 >
-                  <BarChart3 className="mr-3 h-4 w-4" />
-                  Giraffe
+                  <BarChart3
+                    className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                  />
+                  {!sidebarCollapsed && "Giraffe"}
+                </button>
+              )}
+              {SHOW_CROSS_PLATFORM_ANALYTICS && (
+                <button
+                  onClick={() => setActiveTab("cross-platform-analytics")}
+                  className={cn(
+                    "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                    sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
+                    activeTab === "cross-platform-analytics"
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                  title={sidebarCollapsed ? "Cross-Platform Analytics" : ""}
+                >
+                  <BarChart3
+                    className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                  />
+                  {!sidebarCollapsed && "Cross-Platform"}
                 </button>
               )}
               <button
                 onClick={() => setActiveTab("calendar")}
                 className={cn(
-                  "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "w-full flex items-center text-sm font-medium rounded-md transition-all duration-200",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                   activeTab === "calendar"
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
+                title={sidebarCollapsed ? "Calendar" : ""}
               >
-                <Calendar className="mr-3 h-4 w-4" />
-                Calendar
+                <Calendar
+                  className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")}
+                />
+                {!sidebarCollapsed && "Calendar"}
               </button>
             </nav>
           </div>
 
           {/* Admin Quick Actions */}
           {isAdmin && (
-            <div className="p-4 border-t border-gray-200 flex-1">
-              <h3 className="font-medium text-gray-800 mb-3">Quick Actions</h3>
-              <div className="space-y-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-between"
-                    >
-                      <div className="flex items-center">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add New
-                      </div>
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56">
-                    <DropdownMenuItem onClick={() => setGroupDialogOpen(true)}>
-                      <Layers className="mr-2 h-4 w-4" />
-                      Add Group
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setCategoryDialogOpen(true)}
-                    >
-                      <Database className="mr-2 h-4 w-4" />
-                      Add Category
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setPersonDialogOpen(true)}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Add Person
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setAllocationDialogOpen(true)}
-                    >
-                      <ListPlus className="mr-2 h-4 w-4" />
-                      Add Allocation
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTaskDialogOpen(true)}>
-                      <CheckSquare className="mr-2 h-4 w-4" />
-                      Add Task
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            <div className="p-4 border-t border-gray-200">
+              {!sidebarCollapsed && (
+                <>
+                  <h3 className="font-medium text-gray-800 mb-3">
+                    Quick Actions
+                  </h3>
+                  <div className="space-y-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-between"
+                        >
+                          <div className="flex items-center">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add New
+                          </div>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuItem
+                          onClick={() => setGroupDialogOpen(true)}
+                        >
+                          <Layers className="mr-2 h-4 w-4" />
+                          Add Group
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setCategoryDialogOpen(true)}
+                        >
+                          <Database className="mr-2 h-4 w-4" />
+                          Add Category
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setPersonDialogOpen(true)}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Add Person
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setAllocationDialogOpen(true)}
+                        >
+                          <ListPlus className="mr-2 h-4 w-4" />
+                          Add Allocation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setTaskDialogOpen(true)}
+                        >
+                          <CheckSquare className="mr-2 h-4 w-4" />
+                          Add Task
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </>
+              )}
+              {sidebarCollapsed && (
+                <div className="flex justify-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-2 h-8 w-8"
+                        title="Quick Actions"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" side="right">
+                      <DropdownMenuItem
+                        onClick={() => setGroupDialogOpen(true)}
+                      >
+                        <Layers className="mr-2 h-4 w-4" />
+                        Add Group
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setCategoryDialogOpen(true)}
+                      >
+                        <Database className="mr-2 h-4 w-4" />
+                        Add Category
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setPersonDialogOpen(true)}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add Person
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setAllocationDialogOpen(true)}
+                      >
+                        <ListPlus className="mr-2 h-4 w-4" />
+                        Add Allocation
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTaskDialogOpen(true)}>
+                        <CheckSquare className="mr-2 h-4 w-4" />
+                        Add Task
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1240,6 +1379,14 @@ export default function Dashboard() {
               <GiraffeDashboard />
             </div>
           )}
+
+          {/* Cross-Platform Analytics Tab */}
+          {SHOW_CROSS_PLATFORM_ANALYTICS &&
+            activeTab === "cross-platform-analytics" && (
+              <div className="h-full w-full overflow-auto">
+                <JiraAnalytics />
+              </div>
+            )}
 
           {activeTab === "calendar" && (
             <div className="h-full w-full">

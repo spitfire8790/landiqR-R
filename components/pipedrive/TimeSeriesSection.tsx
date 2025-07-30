@@ -48,7 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import { fetchGiraffeUsageData } from "@/lib/giraffe-usage-service";
-import OrganisationRecencyBoxplot from "@/components/OrganisationRecencyBoxplot";
+import OrganisationRecencyBoxplot from "@/components/analytics/charts/OrganisationRecencyBoxplot";
 
 interface DailyCount {
   date: string; // yyyy-mm-dd

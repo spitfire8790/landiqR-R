@@ -79,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Increase timeout to 30 seconds for better reliability
-      const role = await withTimeout(getUserRole(email), 30000);
+      // Reduce timeout to 5 seconds for faster failures
+      const role = await withTimeout(getUserRole(email), 5000);
 
       // Cache the result
       roleCache.current.set(email, { role, timestamp: Date.now() });
@@ -98,8 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Default to null role instead of throwing
-      return null;
+      // Default to readonly role instead of null to prevent blocking
+      return "readonly" as UserRole;
     }
   };
 
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const init = async () => {
       try {
-        const { data } = await withTimeout(supabase.auth.getSession(), 30000);
+        const { data } = await withTimeout(supabase.auth.getSession(), 5000);
         const currentSession = data.session;
         const hasSession = !!currentSession;
         setIsAuthenticated(hasSession);
@@ -197,11 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign-up helper (stores selected role in user_metadata)
   const signup = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Ensure user roles table exists with increased timeout
-      await withTimeout(ensureUserRolesTable(), 30000);
+      // Ensure user roles table exists with reduced timeout
+      await withTimeout(ensureUserRolesTable(), 5000);
 
-      // Check if user has a role in the database with increased timeout
-      const userRole = await withTimeout(getUserRole(email), 30000);
+      // Check if user has a role in the database with reduced timeout
+      const userRole = await withTimeout(getUserRole(email), 5000);
       if (!userRole) {
         console.warn("Signup attempt blocked: user not authorized");
         return false;

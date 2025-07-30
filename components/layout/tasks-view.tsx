@@ -56,9 +56,9 @@ import type {
   Category,
   Person,
 } from "@/lib/types";
-import { TaskDialog } from "@/components/task-dialog";
-import { ResponsibilityDialog } from "@/components/responsibility-dialog";
-import TaskAllocationDialog from "@/components/task-allocation-dialog";
+import { TaskDialog } from "@/components/modals/task-dialog";
+import { ResponsibilityDialog } from "@/components/modals/responsibility-dialog";
+import TaskAllocationDialog from "@/components/modals/task-allocation-dialog";
 import {
   fetchTasksByCategory,
   fetchResponsibilities,
@@ -74,8 +74,8 @@ import {
   getPeopleAllocatedToCategory,
 } from "@/lib/data-service";
 import { useToast } from "@/components/ui/use-toast";
-import { WorkflowDialog } from "@/components/workflow-dialog";
-import { WorkflowToolsDialog } from "@/components/workflow-tools-dialog";
+import { WorkflowDialog } from "@/components/modals/workflow-dialog";
+import { WorkflowToolsDialog } from "@/components/modals/workflow-tools-dialog";
 import { exportTasks } from "@/lib/export-service";
 
 interface TasksViewProps {
