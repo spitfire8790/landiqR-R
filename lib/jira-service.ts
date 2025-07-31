@@ -97,6 +97,39 @@ export interface JiraCustomField {
   };
 }
 
+// Support Analytics Types
+export interface SupportAnalyticsData {
+  organisation: string;
+  totalTickets: number;
+  resolvedTickets: number;
+  resolutionRate: number;
+  avgResolutionTimeHours: number;
+  topIssueTypes: string[];
+  supportHealth: 'low' | 'medium' | 'high';
+  userEmails: string[];
+  recentTickets: RecentTicket[];
+}
+
+export interface RecentTicket {
+  key: string;
+  summary: string;
+  created: string;
+  status: string;
+  priority: string;
+}
+
+interface SupportMetrics {
+  organisation: string;
+  totalTickets: number;
+  resolvedTickets: number;
+  avgResolutionTimeHours: number;
+  resolutionTimes: number[];
+  ticketsByType: Map<string, number>;
+  ticketsByStatus: Map<string, number>;
+  emails: Set<string>;
+  recentTickets: RecentTicket[];
+}
+
 export interface JiraIssue {
   expand: string;
   id: string;
@@ -488,6 +521,231 @@ export class JiraService {
     });
 
     return Array.from(emails);
+  }
+
+  /**
+   * Get support analytics data for organizations
+   * @param days Number of days to look back (default: 90)
+   * @param pipedriveData Optional Pipedrive data for organisation mapping
+   * @returns Promise<SupportAnalyticsData[]>
+   */
+  async getSupportAnalytics(
+    days: number = 90, 
+    pipedriveData?: { persons: any[]; organisations: any[] }
+  ): Promise<SupportAnalyticsData[]> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      const jqlDate = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      const jql = `project = LL1HD AND issuetype = "General request" AND created >= "${jqlDate}" ORDER BY created DESC`;
+      
+      const fields = [
+        'created',
+        'updated', 
+        'status',
+        'priority',
+        'resolution',
+        'resolutiondate',
+        'summary',
+        'reporter',
+        'customfield_10032', // Request participants  
+        'customfield_10133', // Email field
+        'customfield_10171', // Organisation
+        'customfield_10202', // Reporter email
+        'customfield_10172', // Request type
+        'customfield_10232'  // Custom email
+      ];
+
+      const response = await this.searchIssues(jql, {
+        maxResults: 1000,
+        fields: fields
+      });
+
+      console.log('🔍 Jira API Response:', {
+        hasResponse: !!response,
+        responseKeys: response ? Object.keys(response) : null,
+        success: response?.success,
+        hasData: response && !!response.data,
+        hasIssues: response?.data && !!response.data.issues,
+        issuesLength: response?.data?.issues?.length || 0,
+        jqlUsed: jql
+      });
+
+      // Check if response has the expected structure
+      if (!response || !response.success || !response.data || !response.data.issues) {
+        console.error('❌ Invalid Jira API response structure:', {
+          hasResponse: !!response,
+          success: response?.success,
+          hasData: !!response?.data,
+          error: response?.error
+        });
+        return [];
+      }
+
+      // Create email-to-organisation mapping from Pipedrive data
+      const emailToOrgMap = new Map<string, string>();
+      
+      if (pipedriveData) {
+        // Build email to organisation mapping directly from persons data
+        pipedriveData.persons.forEach((person: any) => {
+          // Get email from primary_email field (this is the main email as a string)
+          const emailValue = person.primary_email;
+          
+          // Get organisation name directly from org_name field
+          const orgName = person.org_name;
+          
+          if (emailValue && orgName && typeof emailValue === 'string' && typeof orgName === 'string') {
+            emailToOrgMap.set(emailValue.toLowerCase(), orgName);
+          }
+        });
+        
+        console.log(`📧 Created email-to-org mapping: ${emailToOrgMap.size} entries`);
+        
+        // Debug: Log a sample person structure to understand the data format
+        if (pipedriveData.persons.length > 0) {
+          console.log('📋 Sample Pipedrive person structure:', {
+            keys: Object.keys(pipedriveData.persons[0]),
+            email: pipedriveData.persons[0].email,
+            emailType: typeof pipedriveData.persons[0].email,
+            org_id: pipedriveData.persons[0].org_id,
+            orgIdType: typeof pipedriveData.persons[0].org_id
+          });
+        }
+      }
+
+      const analyticsMap = new Map<string, SupportMetrics>();
+
+      response.data.issues.forEach(issue => {
+        // Extract emails
+        const emails = this.extractEmailsFromIssue([issue]);
+        
+        // Extract organisation using Pipedrive mapping
+        let organisation = 'Unknown Organisation';
+        
+        // First try to find organisation from email mapping
+        if (emails.length > 0 && pipedriveData) {
+          for (const email of emails) {
+            const orgName = emailToOrgMap.get(email.toLowerCase());
+            if (orgName) {
+              organisation = orgName;
+              break;
+            }
+          }
+        }
+        
+        // Fallback to Jira custom field if no Pipedrive match
+        if (organisation === 'Unknown Organisation' && issue.fields.customfield_10171) {
+          organisation = issue.fields.customfield_10171;
+        }
+        
+        // Last resort: extract from email domain
+        if (organisation === 'Unknown Organisation' && emails.length > 0) {
+          const email = emails[0];
+          const domain = email.split('@')[1];
+          if (domain) {
+            organisation = domain.replace(/\.(com|org|net|gov|edu)$/, '').replace(/\./g, ' ');
+            organisation = organisation.charAt(0).toUpperCase() + organisation.slice(1);
+          }
+        }
+
+        if (!analyticsMap.has(organisation)) {
+          analyticsMap.set(organisation, {
+            organisation,
+            totalTickets: 0,
+            resolvedTickets: 0,
+            avgResolutionTimeHours: 0,
+            resolutionTimes: [],
+            ticketsByType: new Map(),
+            ticketsByStatus: new Map(),
+            emails: new Set(),
+            recentTickets: []
+          });
+        }
+
+        const metrics = analyticsMap.get(organisation)!;
+        metrics.totalTickets++;
+        
+        // Add emails to the set
+        emails.forEach(email => metrics.emails.add(email));
+
+        // Track ticket status
+        const status = issue.fields.status?.name || 'Unknown';
+        metrics.ticketsByStatus.set(status, (metrics.ticketsByStatus.get(status) || 0) + 1);
+
+        // Track ticket type
+        const requestType = issue.fields.customfield_10172 || 'General';
+        metrics.ticketsByType.set(requestType, (metrics.ticketsByType.get(requestType) || 0) + 1);
+
+        // Calculate resolution time if resolved
+        if (issue.fields.resolutiondate && issue.fields.created) {
+          metrics.resolvedTickets++;
+          const created = new Date(issue.fields.created);
+          const resolved = new Date(issue.fields.resolutiondate);
+          const resolutionHours = (resolved.getTime() - created.getTime()) / (1000 * 60 * 60);
+          metrics.resolutionTimes.push(resolutionHours);
+        }
+
+        // Store recent ticket info
+        metrics.recentTickets.push({
+          key: issue.key,
+          summary: issue.fields.summary,
+          created: issue.fields.created,
+          status: status,
+          priority: issue.fields.priority?.name || 'Unknown'
+        });
+      });
+
+      // Convert to final format and calculate averages
+      const result: SupportAnalyticsData[] = Array.from(analyticsMap.values()).map(metrics => {
+        const avgResolutionTimeHours = metrics.resolutionTimes.length > 0 
+          ? metrics.resolutionTimes.reduce((a, b) => a + b, 0) / metrics.resolutionTimes.length
+          : 0;
+
+        const resolutionRate = metrics.totalTickets > 0 
+          ? (metrics.resolvedTickets / metrics.totalTickets) * 100 
+          : 0;
+
+        // Get top 3 issue types
+        const topIssueTypes = Array.from(metrics.ticketsByType.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([type, count]) => `${type} (${count})`);
+
+        // Calculate support health based on resolution rate and volume
+        let supportHealth: 'low' | 'medium' | 'high' = 'medium';
+        if (resolutionRate > 80 && metrics.totalTickets < 10) {
+          supportHealth = 'low';
+        } else if (resolutionRate < 50 || metrics.totalTickets > 20) {
+          supportHealth = 'high';
+        }
+
+        return {
+          organisation: metrics.organisation,
+          totalTickets: metrics.totalTickets,
+          resolvedTickets: metrics.resolvedTickets,
+          resolutionRate,
+          avgResolutionTimeHours,
+          topIssueTypes,
+          supportHealth,
+          userEmails: Array.from(metrics.emails),
+          recentTickets: metrics.recentTickets.slice(0, 5) // Keep latest 5
+        };
+      });
+
+      return result.sort((a, b) => b.totalTickets - a.totalTickets);
+
+    } catch (error) {
+      console.error('Error fetching support analytics:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper to extract emails from a single issue
+   */
+  private extractEmailsFromIssue(issues: JiraIssue[]): string[] {
+    return this.extractUserEmails(issues);
   }
 
   /**

@@ -48,7 +48,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import { fetchGiraffeUsageData } from "@/lib/giraffe-usage-service";
+import SupportAnalyticsChart from "@/components/analytics/charts/SupportAnalyticsChart";
 import OrganisationRecencyBoxplot from "@/components/analytics/charts/OrganisationRecencyBoxplot";
+import {
+  fetchAnalyticsEvents,
+  processAnalyticsEventsByDay,
+  DailyAnalyticsEvents,
+} from "@/lib/analytics-events-service";
 
 interface DailyCount {
   date: string; // yyyy-mm-dd
@@ -110,6 +116,10 @@ export default function TimeSeriesSection({
   const [giraffeActive, setGiraffeActive] = useState<Record<string, number>>(
     {}
   );
+  const [analyticsEvents, setAnalyticsEvents] = useState<
+    DailyAnalyticsEvents[]
+  >([]);
+  const [showChart, setShowChart] = useState(true);
 
   // Helper: safely extract the primary email string from a Pipedrive person record
   const extractPrimaryEmail = (person: any): string => {
@@ -237,6 +247,20 @@ export default function TimeSeriesSection({
       setGiraffeActive(giraffeData.activeCounts);
     } catch (err) {
       console.warn("Could not load Giraffe usage data for overlay", err);
+    }
+
+    /* NEW: fetch Land iQ Plus analytics events */
+    try {
+      console.log("📊 Fetching Land iQ Plus analytics events...");
+      const analyticsEventsData = await fetchAnalyticsEvents(90); // Last 90 days
+      const dailyAnalyticsEvents =
+        processAnalyticsEventsByDay(analyticsEventsData);
+      setAnalyticsEvents(dailyAnalyticsEvents);
+      console.log(
+        `✅ Loaded ${analyticsEventsData.length} analytics events across ${dailyAnalyticsEvents.length} days`
+      );
+    } catch (err) {
+      console.warn("Could not load analytics events data", err);
     }
 
     // Fetch Pipedrive activities (client-side safe)
@@ -664,12 +688,16 @@ export default function TimeSeriesSection({
   };
 
   /* ---------------- RENDER ---------------- */
-  // Build combined trend dataset (Land iQ events + Giraffe active users)
+  // Build combined trend dataset (Land iQ events + Giraffe active users + Analytics events)
   const combinedTrend = React.useMemo(() => {
     const mapEvents = new Map(dailyEvents.map((d) => [d.date, d.count]));
+    const mapAnalyticsEvents = new Map(
+      analyticsEvents.map((d) => [d.date, d.count])
+    );
     const dates = Array.from(
       new Set([
         ...dailyEvents.map((d) => d.date),
+        ...analyticsEvents.map((d) => d.date),
         ...Object.keys(giraffeActive),
       ])
     ).sort();
@@ -682,10 +710,11 @@ export default function TimeSeriesSection({
       return {
         date,
         events: mapEvents.get(date) || 0,
+        analyticsEvents: mapAnalyticsEvents.get(date) || 0,
         active: lastActive,
       };
     });
-  }, [dailyEvents, giraffeActive]);
+  }, [dailyEvents, analyticsEvents, giraffeActive]);
 
   return (
     <>
@@ -700,7 +729,9 @@ export default function TimeSeriesSection({
           ) : (
             <ChevronDown className="w-4 h-4 text-gray-500" />
           )}
-          <h2 className="text-lg font-semibold">Land iQ Events per Day</h2>
+          <h2 className="text-lg font-semibold">
+            Land iQ - Project Management Events per Day
+          </h2>
         </div>
         {!trendCollapsed && (
           <div className="w-full h-[300px]">
@@ -733,6 +764,12 @@ export default function TimeSeriesSection({
                   dataKey="events"
                   stroke="#1d4ed8"
                   name="Land iQ Events"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="analyticsEvents"
+                  stroke="#16a34a"
+                  name="Land iQ Plus Events"
                 />
                 <Line
                   type="monotone"
@@ -1074,6 +1111,7 @@ export default function TimeSeriesSection({
           </>
         )}
       </Card>
+      <SupportAnalyticsChart selectedEventFilter={eventFilter} />
       <OrganisationRecencyBoxplot />
     </>
   );

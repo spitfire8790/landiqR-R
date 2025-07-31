@@ -60,7 +60,6 @@ import TasksView from "@/components/layout/tasks-view";
 import WorkflowsTable from "@/components/tables/workflows-table";
 import CalendarView from "@/components/layout/calendar-view";
 import GiraffeDashboard from "@/components/analytics/charts/GiraffeDashboard";
-import JiraAnalytics from "@/components/jira/JiraAnalytics";
 
 import {
   fetchGroups,
@@ -1384,7 +1383,10 @@ export default function Dashboard() {
           {SHOW_CROSS_PLATFORM_ANALYTICS &&
             activeTab === "cross-platform-analytics" && (
               <div className="h-full w-full overflow-auto">
-                <JiraAnalytics />
+                {/* TODO: Re-implement cross-platform analytics component */}
+                <div className="p-8 text-center text-gray-500">
+                  Cross-platform analytics coming soon...
+                </div>
               </div>
             )}
 
